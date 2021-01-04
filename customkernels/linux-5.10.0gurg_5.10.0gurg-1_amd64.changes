@@ -1,0 +1,33 @@
+Format: 1.8
+Date: Tue, 29 Dec 2020 14:41:11 +0000
+Source: linux-5.10.0gurg
+Binary: linux-headers-5.10.0gurg linux-image-5.10.0gurg linux-libc-dev
+Architecture: amd64
+Version: 5.10.0gurg-1
+Distribution: focal
+Urgency: low
+Maintainer: gurg <gurg@reshiram-ubuntu>
+Changed-By: gurg <gurg@reshiram-ubuntu>
+Description:
+ linux-headers-5.10.0gurg - Linux kernel headers for 5.10.0gurg on amd64
+ linux-image-5.10.0gurg - Linux kernel, version 5.10.0gurg
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-5.10.0gurg (5.10.0gurg-1) focal; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ f897f175488260182d48398d803ef5dfbe5b0437 5296 linux-5.10.0gurg_5.10.0gurg-1_amd64.buildinfo
+ 544057141e3da39a281ccbade980447875c5eaa7 7673056 linux-headers-5.10.0gurg_5.10.0gurg-1_amd64.deb
+ 704167d04951fab0e67803ac9c5d3df644202834 10789392 linux-image-5.10.0gurg_5.10.0gurg-1_amd64.deb
+ 0b0e271be84a098faf8df43fb69f5f130e97aa4e 1135156 linux-libc-dev_5.10.0gurg-1_amd64.deb
+Checksums-Sha256:
+ 41706e9b812cd7c6cf1b4cdc80b2ac2ebe64c20775486e27d78f393f4c764430 5296 linux-5.10.0gurg_5.10.0gurg-1_amd64.buildinfo
+ 173acbabd9ad839c8c0da8dce9d775ec82151a5ab225002acfe06150b3c959e9 7673056 linux-headers-5.10.0gurg_5.10.0gurg-1_amd64.deb
+ 49c9a5066445ae38783fffb28edbb3efe91fd2e6340c0ee306c2d9670eaa25c7 10789392 linux-image-5.10.0gurg_5.10.0gurg-1_amd64.deb
+ bc97a1545315c62343c14ac38325ddb3f035c0fe40c605cdbecc47717679819f 1135156 linux-libc-dev_5.10.0gurg-1_amd64.deb
+Files:
+ 45dae1714c6f0a01ea48bfdaff690cca 5296 kernel optional linux-5.10.0gurg_5.10.0gurg-1_amd64.buildinfo
+ bdfc89c86175e55695cd765020cb00bc 7673056 kernel optional linux-headers-5.10.0gurg_5.10.0gurg-1_amd64.deb
+ ae49a3b6e016184e7c7bf6831e9264b5 10789392 kernel optional linux-image-5.10.0gurg_5.10.0gurg-1_amd64.deb
+ 3b2e8aef79723d81408e5c83b084658c 1135156 devel optional linux-libc-dev_5.10.0gurg-1_amd64.deb
