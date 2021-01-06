@@ -15,7 +15,7 @@
 #define MAX_EVENTS 32
 
 //set address and port for socket
-static set_sockaddr(struct sockaddr_in * addr){
+static void set_sockaddr(struct sockaddr_in * addr){
     addr->sin_family = AF_INET;
 
     addr->sin_addr.s_addr = INADDR_ANY;//binds socket to all available interfaces
@@ -111,7 +111,7 @@ int main(){
             if (events[n].data.fd == listen_sock){
                 
                 //accept connection to the given socket and set it to non blocking 
-                conn_sock = accept(listen_sock, (struct sockaddr*)&addr, addr_len);
+                conn_sock = accept(listen_sock, (struct sockaddr*)&addr, &addr_len);
 
                 if (conn_sock == -1){
                     perror("cannot accept new connection");
