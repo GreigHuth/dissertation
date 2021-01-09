@@ -130,7 +130,9 @@ int main(){
             int current_fd = events[n].data.fd;
 
             if (current_fd == listen_sock){
-                
+                //printf("current fd:%d\n", current_fd);
+                //printf("listen sock: %d", listen_sock);
+
                 //check to make sure we have space for new connections
                 if (n_afds >= MAX_CLIENTS){
                     printf("cannot accept more conncetions\n");
@@ -169,21 +171,33 @@ int main(){
                 bzero(buf, sizeof(buf));
 
                 //read from socket, if we get an error then close all of the fd's
-                if (read(events[n].data.fd, buf, sizeof(buf)) == -1){
-                    perror("read");
-                    goto close_epfds;
-                } 
-                //write data to stdout, 
-                write(1, buf, sizeof(buf));
+                int bytes_recv = read(events[n].data.fd, buf, sizeof(buf));
 
+                //this part is  copied from michios code
+                // removes the currentfd from the list of active fds
+                if ( bytes_recv <= 0){
+                    for (int i =0; i < n_afds; i++){
+                        if (current_fd == afds[i]){
+                            n_afds--;
 
-                //echo the thing we got, if it fails then close all fd's
-                int x = write(current_fd, buf, sizeof(buf));
-                if (x<0){
-                    perror("write");
-                    goto close_epfds;
+                            //shifts all the active fd's down the list
+                            if (i != n_afds){
+                                memmove(&afds[i], &afds[i+1]
+                                    ,sizeof(afds[0]) * (n_afds-i));
+                            }
+                        }
+                    }
+
+                    epoll_ctl(epollfd,EPOLL_CTL_DEL, current_fd, NULL);
+                    close(current_fd);
+                }else
+                {
+                    char *hello = "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 12\n\nHello world!";
+                    write(1, buf, sizeof(buf));
+                    write(current_fd, hello, strlen(hello));
                 }
                 
+
                 
             }
         }
