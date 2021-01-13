@@ -15,9 +15,9 @@
 #define PORT 1234
 #define Q_LEN 16
 #define MAX_EVENTS 32
-#define MAX_CLIENTS 1000
+#define MAX_CLIENTS 10000
 #define BUFFER_SIZE 1024
-
+#define EPOLL_TIMEOUT 0
 
 static void add_epoll_ctl(int epollfd, int socket, struct epoll_event ev){
     
@@ -56,6 +56,11 @@ int main(){
     int afds[MAX_CLIENTS]; //active file descriptors
     int n_afds = 0; //afds is like a stack so we need to keep track of our position
 
+    //print various configuration settings
+    printf("PORT: %d\n", PORT);
+    printf("EPOLL_Q_LENGTH: %d\n", Q_LEN);
+    printf("MAX_CLIENTS: %d\n", MAX_CLIENTS);
+    printf("EPOLL_TIMEOUT: %d\n", EPOLL_TIMEOUT);
 
 
     //first we need to set up the addresses
@@ -116,7 +121,7 @@ int main(){
     for (;;){
 
         //returns the # of fd's ready for I/O
-        nfds = epoll_wait(epollfd, events, MAX_EVENTS, 2000);
+        nfds = epoll_wait(epollfd, events, MAX_EVENTS, EPOLL_TIMEOUT);
 
         if (nfds == -1){
             perror("epoll_wait");
@@ -150,11 +155,11 @@ int main(){
                 //add new connection to list of active connections
                 afds[n_afds] = conn_sock;
                 n_afds++;
-                printf("new fd %d was added to n_afds %d\n", conn_sock, n_afds-1);
+                //printf("new fd %d was added to n_afds %d\n", conn_sock, n_afds-1);
 
 
                 //get info about client
-                printf("new connection from client:%s\n",inet_ntoa(c_addr.sin_addr));
+                //printf("new connection from client:%s\n",inet_ntoa(c_addr.sin_addr));
 
                 //add new connection socket to the interest list
                 //setnonblocking(conn_sock); //make sure new socket is non blocking
@@ -193,7 +198,7 @@ int main(){
                 }else
                 {
                     char *hello = "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 12\n\nHello world!";
-                    write(1, buf, sizeof(buf));
+                    //write(1, buf, sizeof(buf));
                     write(current_fd, hello, strlen(hello));
                 }
                 
