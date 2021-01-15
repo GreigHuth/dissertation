@@ -9,6 +9,6 @@ fi
 
 echo "starting iperf server bound to ip:" $1; 
 
-iperf3 -f m -s -B $1 -D --logfile /home/$USER/iperf3log
+iperf3 -f m -s -B $1 --logfile /home/$USER/iperf3log
 
-echo "daemon running"
+echo "iperf server running"
