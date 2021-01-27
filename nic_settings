@@ -1,0 +1,3 @@
+ethtool -l enp1s0f0
+ethtool -g enp1s0f0
+ethtool -c enp1s0f0

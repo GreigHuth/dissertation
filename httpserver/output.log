@@ -1,6 +1,0 @@
-echo_server
-echo_server.c
-echo_server.log
-output.log
-tcp_client
-tcp_client.c
