@@ -38,6 +38,28 @@ static void add_epoll_ctl(int epollfd, int socket, struct epoll_event ev){
     }
 }
 
+//set address and port for socket
+static void set_sockaddr(struct sockaddr_in * addr){
+    addr->sin_family = AF_INET;
+
+    addr->sin_addr.s_addr = INADDR_ANY;//binds socket to all available interfaces
+    //manual addr assignment: inet_aton('127.0.0.1', addr->sin_addr.s_addr);
+
+    //htons convers byte order from host to network order 
+    addr->sin_port = htons(PORT);
+}
+
+//set fd to non blocking, more portable than doing it in the socket definition
+static int setnonblocking(int sockfd)
+{
+	if (fcntl(sockfd, F_SETFD, fcntl(sockfd, F_GETFD, 0) | O_NONBLOCK) ==-1) {
+		return -1;
+	}
+	return 0;
+}
+
+
+
 //using void as a pointer lets you point to anything you like,
 //and for some reason when threading you need to pass the arg struct as void
 void *polling_thread(void *data){
@@ -83,6 +105,7 @@ void *polling_thread(void *data){
 
                 //set up ev for new socket
                 ev.events = EPOLLIN;
+                setnonblocking(conn_sock);
                 ev.data.fd = conn_sock;
                 add_epoll_ctl(epollfd, conn_sock, ev);
 
@@ -118,26 +141,6 @@ void *polling_thread(void *data){
 
 }
 
-
-//set address and port for socket
-static void set_sockaddr(struct sockaddr_in * addr){
-    addr->sin_family = AF_INET;
-
-    addr->sin_addr.s_addr = INADDR_ANY;//binds socket to all available interfaces
-    //manual addr assignment: inet_aton('127.0.0.1', addr->sin_addr.s_addr);
-
-    //htons convers byte order from host to network order 
-    addr->sin_port = htons(PORT);
-}
-
-//set fd to non blocking, more portable than doing it in the socket definition
-static int setnonblocking(int sockfd)
-{
-	if (fcntl(sockfd, F_SETFD, fcntl(sockfd, F_GETFD, 0) | O_NONBLOCK) ==-1) {
-		return -1;
-	}
-	return 0;
-}
 
 int main(){
     
