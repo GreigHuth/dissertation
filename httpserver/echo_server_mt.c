@@ -22,7 +22,7 @@
 #define EPOLL_TIMEOUT 0
 
 struct t_args{
-    void* threadID;
+    int threadID;
     int epollfd;
     struct epoll_event ev;
     struct epoll_event * events;
@@ -67,6 +67,7 @@ void *polling_thread(void *data){
     struct t_args *args = data;
 
     //unpack arguments
+    int threadID = args->threadID;
     int epollfd = args->epollfd;
     struct epoll_event ev = args->ev;
     struct epoll_event *events = args->events;
@@ -108,11 +109,13 @@ void *polling_thread(void *data){
                 setnonblocking(conn_sock);
                 ev.data.fd = conn_sock;
                 add_epoll_ctl(epollfd, conn_sock, ev);
+                printf("thread %d: handing new connection", threadID);
 
 
             //if current_fd is not the listener we can do stuff
             }else {
 
+                printf("thread %d: handling I/O\n", threadID);
                 char buf[BUFFER_SIZE];
 
                 bzero(buf, sizeof(buf));
@@ -228,6 +231,7 @@ int main(){
     
     int rc;
     for (long i; i < 4; i++){
+        t_args.threadID = i;
         printf("creating thread %ld\n", i);
         rc = pthread_create(&threads[i], NULL, polling_thread, &t_args);
         if (rc){
