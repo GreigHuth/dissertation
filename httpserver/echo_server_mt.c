@@ -21,15 +21,15 @@
 #define BUFFER_SIZE 1024
 #define EPOLL_TIMEOUT 0
 
+
+//struct to pass the listen socket to the threads
 struct t_args{
     int threadID;
-    int epollfd;
-    struct epoll_event ev;
-    struct epoll_event * events;
     int listen_sock;
 }t_args;
 
 
+//this gets done a lot so a function makes sense 
 static void add_epoll_ctl(int epollfd, int socket, struct epoll_event ev){
     
     if (epoll_ctl(epollfd, EPOLL_CTL_ADD, socket, &ev) == -1){
@@ -37,6 +37,7 @@ static void add_epoll_ctl(int epollfd, int socket, struct epoll_event ev){
         exit(EXIT_FAILURE);
     }
 }
+
 
 //set address and port for socket
 static void set_sockaddr(struct sockaddr_in * addr){
@@ -49,6 +50,7 @@ static void set_sockaddr(struct sockaddr_in * addr){
     addr->sin_port = htons(PORT);
 }
 
+
 //set fd to non blocking, more portable than doing it in the socket definition
 static int setnonblocking(int sockfd)
 {
@@ -59,7 +61,6 @@ static int setnonblocking(int sockfd)
 }
 
 
-
 //using void as a pointer lets you point to anything you like,
 //and for some reason when threading you need to pass the arg struct as void
 void *polling_thread(void *data){
@@ -68,10 +69,21 @@ void *polling_thread(void *data){
 
     //unpack arguments
     int threadID = args->threadID;
-    int epollfd = args->epollfd;
-    struct epoll_event ev = args->ev;
-    struct epoll_event *events = args->events;
     int listen_sock = args->listen_sock;
+
+    //create epoll instance
+    int epollfd = epoll_create1(EPOLL_CLOEXEC);
+    if (epollfd == -1) {
+               perror("cant create epoll instance");
+               exit(EXIT_FAILURE);
+    }
+
+    struct epoll_event ev, events[MAX_EVENTS];
+    ev.events = EPOLLIN; //type of event we are looking for
+    ev.data.fd = listen_sock; 
+
+    //add listen socket to interest list
+    add_epoll_ctl(epollfd, listen_sock, ev);
     
     printf("polling thread started\n");
 
@@ -109,23 +121,18 @@ void *polling_thread(void *data){
                 setnonblocking(conn_sock);
                 ev.data.fd = conn_sock;
                 add_epoll_ctl(epollfd, conn_sock, ev);
-                printf("thread %d: handing new connection", threadID);
 
 
             //if current_fd is not the listener we can do stuff
             }else {
 
-                printf("thread %d: handling I/O\n", threadID);
+                //make the buffer and 0 it
                 char buf[BUFFER_SIZE];
-
                 bzero(buf, sizeof(buf));
 
                 //read from socket, if we get an error then close all of the fd's
                 int bytes_recv = read(events[n].data.fd, buf, sizeof(buf));
-
-                //this part is  copied from michios code
-                // removes the currentfd from the list of active fds
-                if ( bytes_recv <= 0){
+                if (bytes_recv <= 0){
                     epoll_ctl(epollfd,EPOLL_CTL_DEL, current_fd, NULL);
                     close(current_fd);
                 }else
@@ -134,21 +141,15 @@ void *polling_thread(void *data){
                     //write(1, buf, sizeof(buf));
                     write(current_fd, hello, strlen(hello));
                 }
-                
-
-                
             }
         }
     }
-
-
 }
 
 
 int main(){
     
-    struct epoll_event ev, events[MAX_EVENTS];
-    int listen_sock, conn_sock, nfds, epollfd;
+    int listen_sock;
     int afds[MAX_CLIENTS]; //active file descriptors
     int n_afds = 0; //afds is like a stack so we need to keep track of our position
 
@@ -181,7 +182,7 @@ int main(){
 
 
     //bind listener to addr and port 
-    if ( bind(listen_sock, (struct sockaddr *) &s_addr, s_addr_len) < 0){
+    if (bind(listen_sock, (struct sockaddr *) &s_addr, s_addr_len) < 0){
         perror("bind failed");
         exit(EXIT_FAILURE);
     }
@@ -195,45 +196,21 @@ int main(){
     }
     printf("listener listening, we gucci\n");
 
-    //create epoll instance
-    epollfd = epoll_create1(EPOLL_CLOEXEC);
-    if (epollfd == -1) {
-               perror("cant create epoll instance");
-               exit(EXIT_FAILURE);
-    }
-
-    //populate ev with data so epoll will work
-    ev.events = EPOLLIN; //type of event we are looking for
-    ev.data.fd = listen_sock; 
-
-    //add listen socket to interest list
-    add_epoll_ctl(epollfd, listen_sock, ev);
-
+    
 
     
-    /*
-    void* threadID;
-    int epollfd;
-    struct epoll_event ev;
-    struct epoll_event events[MAX_EVENTS];
-    int listen_sock;
-    */
-   //populate args struct
-    t_args.epollfd = epollfd;
-    t_args.ev = ev;
-    t_args.events = events;
+    //make sure to pass the socket to the threads
     t_args.listen_sock = listen_sock;
 
 
 
     //now on to the actual polling
-    pthread_t threads[4];//4 cores so 4 threads
-    
-    int rc;
-    for (long i; i < 4; i++){
+    pthread_t threads[4];//4 seems like a good number
+
+    for (int i; i < 4; i++){
+        printf("creating thread %d\n", i);
         t_args.threadID = i;
-        printf("creating thread %ld\n", i);
-        rc = pthread_create(&threads[i], NULL, polling_thread, &t_args);
+        int rc = pthread_create(&threads[i], NULL, polling_thread, &t_args);
         if (rc){
             printf("ERROR; return code from pthread_create() is %d\n", rc);
             exit(0);
@@ -241,17 +218,10 @@ int main(){
     }
 
 
+
+    //if you dont ask, i wont tell
     while (1){
 
     }
-
-
-
-//branch for closing fd's
-close_epfds:
-    for (int i = 0; i < n_afds; i++) {
-		close(afds[i]);
-    }
-	close(epollfd);
 
 }
