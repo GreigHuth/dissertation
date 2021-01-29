@@ -20,7 +20,7 @@
 #define MAX_CLIENTS 10000
 #define BUFFER_SIZE 1024
 #define EPOLL_TIMEOUT 0
-
+#define THREADS 4
 
 //struct to pass the listen socket to the threads
 struct t_args{
@@ -66,7 +66,6 @@ static int setnonblocking(int sockfd)
 void *polling_thread(void *data){
 
     struct t_args *args = data;
-
     //unpack arguments
     int threadID = args->threadID;
     int listen_sock = args->listen_sock;
@@ -80,18 +79,17 @@ void *polling_thread(void *data){
 
     struct epoll_event ev, events[MAX_EVENTS];
     ev.events = EPOLLIN; //type of event we are looking for
-    ev.data.fd = listen_sock; 
+    ev.data.fd = listen_sock;
 
     //add listen socket to interest list
     add_epoll_ctl(epollfd, listen_sock, ev);
-    
+
     printf("polling thread started\n");
 
     for (;;){
 
         //returns the # of fd's ready for I/O
         int nfds = epoll_wait(epollfd, events, MAX_EVENTS, EPOLL_TIMEOUT);
-
         if (nfds == -1){
             perror("epoll_wait");
             exit(EXIT_FAILURE);
@@ -102,7 +100,6 @@ void *polling_thread(void *data){
 
             //if the listen socket is ready to read then we have a new connection
             int current_fd = events[n].data.fd;
-
             if (current_fd == listen_sock){
 
                 struct sockaddr_in c_addr;//address of the client
@@ -130,13 +127,12 @@ void *polling_thread(void *data){
                 char buf[BUFFER_SIZE];
                 bzero(buf, sizeof(buf));
 
-                //read from socket, if we get an error then close all of the fd's
+                //read from socket, if done or there is an error remove the fd from epoll and close it
                 int bytes_recv = read(events[n].data.fd, buf, sizeof(buf));
                 if (bytes_recv <= 0){
                     epoll_ctl(epollfd,EPOLL_CTL_DEL, current_fd, NULL);
                     close(current_fd);
-                }else
-                {
+                }else{
                     char *hello = "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 12\n\nHello world!";
                     //write(1, buf, sizeof(buf));
                     write(current_fd, hello, strlen(hello));
@@ -196,18 +192,15 @@ int main(){
     }
     printf("listener listening, we gucci\n");
 
-    
-
-    
     //make sure to pass the socket to the threads
     t_args.listen_sock = listen_sock;
 
-
-
     //now on to the actual polling
-    pthread_t threads[4];//4 seems like a good number
+    pthread_t threads[THREADS];//4 seems like a good number
 
-    for (int i; i < 4; i++){
+    //each thread has its own epoll instance, the only thing they share is the listen socket
+    //tried 
+    for (int i; i < sizeof(threads); i++){
         printf("creating thread %d\n", i);
         t_args.threadID = i;
         int rc = pthread_create(&threads[i], NULL, polling_thread, &t_args);
@@ -217,11 +210,7 @@ int main(){
         }
     }
 
-
-
     //if you dont ask, i wont tell
     while (1){
-
     }
-
 }
