@@ -183,17 +183,17 @@ int main(){
                 //this part is  copied from michios code
                 // removes the currentfd from the list of active fds
                 if ( bytes_recv <= 0){
-                    for (int i =0; i < n_afds; i++){
-                        if (current_fd == afds[i]){
-                            n_afds--;
-
-                            //shifts all the active fd's down the list
-                            if (i != n_afds){
-                                memmove(&afds[i], &afds[i+1]
-                                    ,sizeof(afds[0]) * (n_afds-i));
-                            }
-                        }
-                    }
+//                    for (int i =0; i < n_afds; i++){
+//                        if (current_fd == afds[i]){
+//                            n_afds--;
+//
+//                            //shifts all the active fd's down the list
+//                            if (i != n_afds){
+//                                memmove(&afds[i], &afds[i+1]
+//                                    ,sizeof(afds[0]) * (n_afds-i));
+//                            }
+//                        }
+//                    }
 
                     epoll_ctl(epollfd,EPOLL_CTL_DEL, current_fd, NULL);
                     close(current_fd);
