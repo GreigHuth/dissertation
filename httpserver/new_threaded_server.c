@@ -22,6 +22,8 @@
 #define EPOLL_TIMEOUT 0
 #define THREADS 4
 
+int connections[THREADS];
+
 //struct to pass the listen socket to the threads
 struct t_args{
     int threadID;
@@ -63,6 +65,10 @@ static int setnonblocking(int sockfd)
 //using void as a pointer lets you point to anything you like,
 //and for some reason when threading you need to pass the arg struct as void
 void *polling_thread(void *data){
+
+    struct t_args *args = data;
+    //unpack arguments
+    int threadID = args->threadID;
 
     int listen_sock;
 
@@ -138,6 +144,8 @@ void *polling_thread(void *data){
             int current_fd = events[n].data.fd;
             if (current_fd == listen_sock){
 
+                connections[threadID]++;
+
                 struct sockaddr_in c_addr;//address of the client
                 int c_addr_len = sizeof(c_addr);
 
@@ -168,6 +176,7 @@ void *polling_thread(void *data){
                 if (bytes_recv <= 0){
                     epoll_ctl(epollfd,EPOLL_CTL_DEL, current_fd, NULL);
                     close(current_fd);
+                    connections[threadID]--;
                 }else{
                     char *hello = "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 12\n\nHello world!";
                     //write(1, buf, sizeof(buf));
@@ -206,6 +215,10 @@ int main(){
     }
 
     //if you dont ask, i wont tell
-    while (1){
+    for (;;){
+        for (int i=0; i < THREADS; i++){
+            printf("thread %d: %d\n",i, connections[i]);
+        }
+        sleep(1);
     }
 }
