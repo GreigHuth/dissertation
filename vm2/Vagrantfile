@@ -1,0 +1,8 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/debian9" 
+  
+  config.vm .define :test_vm2 do |test_vm2|
+     test_vm2.vm.network :private_network, :ip => "11.22.33.44"
+  end
+
+end
