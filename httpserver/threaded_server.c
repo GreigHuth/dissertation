@@ -200,7 +200,7 @@ int main(){
 
     //each thread has its own epoll instance, the only thing they share is the listen socket
     //tried 
-    for (int i; i < sizeof(threads); i++){
+    for (int i; i < THREADS; i++){
         printf("creating thread %d\n", i);
         t_args.threadID = i;
         int rc = pthread_create(&threads[i], NULL, polling_thread, &t_args);

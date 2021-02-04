@@ -85,6 +85,11 @@ void *polling_thread(void *data){
 		close(listen_sock);
 	}
 
+    if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEPORT, &(int){1}, sizeof(int))){
+		perror("setsockopt");
+		close(listen_sock);
+	}
+
 
     //bind listener to addr and port 
     if (bind(listen_sock, (struct sockaddr *) &s_addr, s_addr_len) < 0){
@@ -184,17 +189,13 @@ int main(){
     printf("MAX_CLIENTS: %d\n", MAX_CLIENTS);
     printf("EPOLL_TIMEOUT: %d\n", EPOLL_TIMEOUT);
 
-
-    
-    
-
-
     //now on to the actual polling
     pthread_t threads[THREADS];//4 seems like a good number
 
+
     //each thread has its own epoll instance, the only thing they share is the listen socket
     //tried 
-    for (int i; i < sizeof(threads); i++){
+    for (int i=0; i < THREADS; i++){
         printf("creating thread %d\n", i);
         t_args.threadID = i;
         int rc = pthread_create(&threads[i], NULL, polling_thread, &t_args);
