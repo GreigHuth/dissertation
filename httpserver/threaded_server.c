@@ -22,6 +22,8 @@
 #define EPOLL_TIMEOUT 0
 #define THREADS 4
 
+int conns[THREADS];
+
 //struct to pass the listen socket to the threads
 struct t_args{
     int threadID;
@@ -70,6 +72,8 @@ void *polling_thread(void *data){
     int threadID = args->threadID;
     int listen_sock = args->listen_sock;
 
+    printf("thread %d created\n", threadID);
+
     //create epoll instance
     int epollfd = epoll_create1(EPOLL_CLOEXEC);
     if (epollfd == -1) {
@@ -84,8 +88,7 @@ void *polling_thread(void *data){
     //add listen socket to interest list
     add_epoll_ctl(epollfd, listen_sock, ev);
 
-    printf("polling thread started\n");
-
+    
     for (;;){
 
         //returns the # of fd's ready for I/O
@@ -102,6 +105,8 @@ void *polling_thread(void *data){
             int current_fd = events[n].data.fd;
             if (current_fd == listen_sock){
 
+                printf("New connection accepted in thread %d\n", threadID);
+                conns[threadID]++;
                 struct sockaddr_in c_addr;//address of the client
                 int c_addr_len = sizeof(c_addr);
 
@@ -132,6 +137,8 @@ void *polling_thread(void *data){
                 if (bytes_recv <= 0){
                     epoll_ctl(epollfd,EPOLL_CTL_DEL, current_fd, NULL);
                     close(current_fd);
+                    printf("Connection closed in thread %d\n", threadID);
+                    conns[threadID]--;
                 }else{
                     char *hello = "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 12\n\nHello world!";
                     //write(1, buf, sizeof(buf));
@@ -200,10 +207,10 @@ int main(){
 
     //each thread has its own epoll instance, the only thing they share is the listen socket
     //tried 
-    for (int i; i < THREADS; i++){
-        printf("creating thread %d\n", i);
+    for (int i=0; i < THREADS; i++){
         t_args.threadID = i;
         int rc = pthread_create(&threads[i], NULL, polling_thread, &t_args);
+        sleep(1);
         if (rc){
             printf("ERROR; return code from pthread_create() is %d\n", rc);
             exit(0);
@@ -211,6 +218,14 @@ int main(){
     }
 
     //if you dont ask, i wont tell
-    while (1){
+    for (;;){
+        int total=0;
+        for (int i=0; i < THREADS; i++){
+            total += conns[i];
+            printf("thread %d: %d\n",i, conns[i]);
+        }
+        printf("Total: %d\n", total);
+        sleep(3);
+        
     }
 }

@@ -70,6 +70,8 @@ void *polling_thread(void *data){
     //unpack arguments
     int threadID = args->threadID;
 
+    printf("Thread %d created\n",threadID);
+
     int listen_sock;
 
     //first we need to set up the addresses
@@ -83,7 +85,7 @@ void *polling_thread(void *data){
         perror("socket failed");
         exit(EXIT_FAILURE);
     }
-    printf("Socket created, binding socket...\n");
+    
 
     //set sock options that allow you to reuse addresses
     if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int))){
@@ -102,15 +104,14 @@ void *polling_thread(void *data){
         perror("bind failed");
         exit(EXIT_FAILURE);
     }
-    printf("socket bound, setting up listener...\n");
-
+    
 
     //start listening for connections
     if (listen(listen_sock, Q_LEN) < 0){
         perror("listening failed");
         exit(EXIT_FAILURE);
     }
-    printf("listener listening, we gucci\n");
+    
 
     //create epoll instance
     int epollfd = epoll_create1(EPOLL_CLOEXEC);
@@ -125,8 +126,6 @@ void *polling_thread(void *data){
 
     //add listen socket to interest list
     add_epoll_ctl(epollfd, listen_sock, ev);
-
-    printf("polling thread started\n");
 
     for (;;){
 
@@ -205,9 +204,9 @@ int main(){
     //each thread has its own epoll instance, the only thing they share is the listen socket
     //tried 
     for (int i=0; i < THREADS; i++){
-        printf("creating thread %d\n", i);
         t_args.threadID = i;
         int rc = pthread_create(&threads[i], NULL, polling_thread, &t_args);
+        sleep(1);
         if (rc){
             printf("ERROR; return code from pthread_create() is %d\n", rc);
             exit(0);
@@ -219,6 +218,7 @@ int main(){
         for (int i=0; i < THREADS; i++){
             printf("thread %d: %d\n",i, connections[i]);
         }
-        sleep(1);
+        sleep(2);
+        system("clear");
     }
 }
