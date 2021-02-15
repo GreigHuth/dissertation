@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,7 +23,15 @@
 #define EPOLL_TIMEOUT 0
 #define THREADS 4
 
+
+//Global variables 
 int connections[THREADS];
+int sent_bytes[THREADS];
+int mode = 1; // 0 -  throughput testing mode
+              // 1 -  latency testing mode 
+
+int t_size = 0; //data transfer size
+
 
 //struct to pass the listen socket to the threads
 struct t_args{
@@ -32,7 +41,6 @@ struct t_args{
 
 //this gets done a lot so a function makes sense 
 static void add_epoll_ctl(int epollfd, int socket, struct epoll_event ev){
-    
     if (epoll_ctl(epollfd, EPOLL_CTL_ADD, socket, &ev) == -1){
         perror("adding listen_sock to epoll_ctl failed");
         exit(EXIT_FAILURE);
@@ -167,7 +175,7 @@ void *polling_thread(void *data){
             }else {
 
                 //make the buffer and 0 it
-                char buf[BUFFER_SIZE];
+                char buf[BUFFER_SIZE]; // read buffer
                 bzero(buf, sizeof(buf));
 
                 //read from socket, if done or there is an error remove the fd from epoll and close it
@@ -176,10 +184,30 @@ void *polling_thread(void *data){
                     epoll_ctl(epollfd,EPOLL_CTL_DEL, current_fd, NULL);
                     close(current_fd);
                     connections[threadID]--;
+                    sent_bytes[threadID] = 0;
                 }else{
-                    char *hello = "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 12\n\nHello world!";
-                    //write(1, buf, sizeof(buf));
-                    write(current_fd, hello, strlen(hello));
+
+                    if (mode == 1){ //latency tests
+                        char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\nHello world!";
+                        write(current_fd, header, strlen(header));
+
+                    } else if (mode == 0){ //tp testing
+                        char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %ld\r\n\r\n";
+                        char* data = NULL;
+                        
+                        int r = asprintf(&data, header,t_size);
+                        
+                        char *payload = NULL;
+                        
+                        payload = (char*) malloc(t_size); //allocate memory for bulk file transfer and initialise
+                        memset(payload, 0, t_size);
+                    
+                        strcat(data, payload);//concat payload to header for sending
+                        write(current_fd, data, strlen(header)+t_size);
+                    
+                        sent_bytes[threadID] = t_size;//used for tp tracking
+                        free(payload);
+                    }
                 }
             }
         }
@@ -187,9 +215,23 @@ void *polling_thread(void *data){
 }
 
 
-int main(){
+int main(int argc, char *argv[]){
     
-    
+    //arg handling
+    if (argc < 2){
+        printf("USAGE: ./new <mode> <data transfer size>\n");
+        exit(0);
+    }
+
+    if (*argv[1] == '0'){
+        if (argc < 3){
+            printf("If using throughput testing mode please supply trasfer size\n");
+            exit(0);
+        }else{
+            t_size = atoi(argv[2]);
+            mode = 0;
+        }
+    }
 
     //print various configuration settings
     printf("PORT: %d\n", PORT);
@@ -197,28 +239,29 @@ int main(){
     printf("MAX_CLIENTS: %d\n", MAX_CLIENTS);
     printf("EPOLL_TIMEOUT: %d\n", EPOLL_TIMEOUT);
 
-    //now on to the actual polling
-    pthread_t threads[THREADS];//4 seems like a good number
-
-
-    //each thread has its own epoll instance, the only thing they share is the listen socket
-    //tried 
+    //each thread has its own listener and epoll instance, the only thing they share is the port
+    pthread_t threads[THREADS];
     for (int i=0; i < THREADS; i++){
         t_args.threadID = i;
         int rc = pthread_create(&threads[i], NULL, polling_thread, &t_args);
-        sleep(1);
+        sleep(.25);//the threads dont intialise properly unless i have this here, idk why
         if (rc){
             printf("ERROR; return code from pthread_create() is %d\n", rc);
             exit(0);
         }
     }
 
-    //if you dont ask, i wont tell
     for (;;){
         for (int i=0; i < THREADS; i++){
-            printf("thread %d: %d\n",i, connections[i]);
+            printf("thread %d connections: %d\n",i, connections[i]);
+            
         }
-        sleep(2);
+        for (int i=0; i < THREADS; i++){
+            printf("thread %d sent bytes: %d\n",i, sent_bytes[i]);            
+        }
+
+        
+        sleep(1);
         system("clear");
     }
 }
