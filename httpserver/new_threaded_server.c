@@ -188,24 +188,23 @@ void *polling_thread(void *data){
                 }else{
 
                     if (mode == 1){ //latency tests
-                        char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\nHello world!";
+                        char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
                         write(current_fd, header, strlen(header));
 
                     } else if (mode == 0){ //tp testing
                         char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %ld\r\n\r\n";
                         char* data = NULL;
-                        
+
                         int r = asprintf(&data, header,t_size);
-                        
+
                         char *payload = NULL;
-                        
+
                         payload = (char*) malloc(t_size); //allocate memory for bulk file transfer and initialise
                         memset(payload, 0, t_size);
-                    
+
                         strcat(data, payload);//concat payload to header for sending
+                        sent_bytes[threadID]++;//used for tp tracking
                         write(current_fd, data, strlen(header)+t_size);
-                    
-                        sent_bytes[threadID] = t_size;//used for tp tracking
                         free(payload);
                     }
                 }
@@ -257,7 +256,7 @@ int main(int argc, char *argv[]){
             
         }
         for (int i=0; i < THREADS; i++){
-            printf("thread %d sent bytes: %d\n",i, sent_bytes[i]);            
+            printf("thread %d requests: %d\n",i, sent_bytes[i]);            
         }
 
         
