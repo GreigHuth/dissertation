@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,6 +12,7 @@
 #include <netinet/in.h> 
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
 
 #define PORT 1234
@@ -19,6 +21,16 @@
 #define MAX_CLIENTS 10000
 #define BUFFER_SIZE 1024
 #define EPOLL_TIMEOUT 0
+
+
+//Global variables 
+int connections;
+int sent_bytes;
+int mode = 1; // 0 -  throughput testing mode
+              // 1 -  latency testing mode 
+
+int t_size = 0; //data transfer size
+
 
 static void add_epoll_ctl(int epollfd, int socket, struct epoll_event ev){
     
@@ -50,13 +62,25 @@ static int setnonblocking(int sockfd)
 	return 0;
 }
 
-int main(){
+int main(int argc, char *argv[]){
     
     struct epoll_event ev, events[MAX_EVENTS];
     int listen_sock, conn_sock, nfds, epollfd;
-    char buf[BUFFER_SIZE];
-    int afds[MAX_CLIENTS]; //active file descriptors
-    int n_afds = 0; //afds is like a stack so we need to keep track of our position
+
+    if (argc < 2){
+        printf("USAGE: COMMAND <mode> <data transfer size>\n");
+        exit(0);
+    }
+
+    if (*argv[1] == '0'){
+        if (argc < 3){
+            printf("If using throughput testing mode please supply trasfer size\n");
+            exit(0);
+        }else{
+            t_size = atoi(argv[2]);
+            mode = 0;
+        }
+    }
 
     //print various configuration settings
     printf("PORT: %d\n", PORT);
@@ -137,14 +161,6 @@ int main(){
             int current_fd = events[n].data.fd;
 
             if (current_fd == listen_sock){
-                //printf("current fd:%d\n", current_fd);
-                //printf("listen sock: %d", listen_sock);
-
-                //check to make sure we have space for new connections
-                if (n_afds >= MAX_CLIENTS){
-                    printf("cannot accept more conncetions\n");
-                    continue;
-                }
 
 
                 //assign socket to the new connection
@@ -154,17 +170,7 @@ int main(){
                     exit(EXIT_FAILURE);
                 }
 
-                //add new connection to list of active connections
-                afds[n_afds] = conn_sock;
-                n_afds++;
-                //printf("new fd %d was added to n_afds %d\n", conn_sock, n_afds-1);
-
-
-                //get info about client
-                //printf("new connection from client:%s\n",inet_ntoa(c_addr.sin_addr));
-
-                //add new connection socket to the interest list
-                //setnonblocking(conn_sock); //make sure new socket is non blocking
+                setnonblocking(conn_sock); //make sure new socket is non blocking
 
                 //set up ev for new socket
                 ev.events = EPOLLIN;
@@ -174,48 +180,43 @@ int main(){
 
             //if current_fd is not the listener we can do stuff
             }else {
-
+                
+                char buf[BUFFER_SIZE];
                 bzero(buf, sizeof(buf));
 
                 //read from socket, if we get an error then close all of the fd's
                 int bytes_recv = read(events[n].data.fd, buf, sizeof(buf));
-
-                //this part is  copied from michios code
-                // removes the currentfd from the list of active fds
-                if ( bytes_recv <= 0){
-//                    for (int i =0; i < n_afds; i++){
-//                        if (current_fd == afds[i]){
-//                            n_afds--;
-//
-//                            //shifts all the active fd's down the list
-//                            if (i != n_afds){
-//                                memmove(&afds[i], &afds[i+1]
-//                                    ,sizeof(afds[0]) * (n_afds-i));
-//                            }
-//                        }
-//                    }
-
+                if (bytes_recv <= 0){
                     epoll_ctl(epollfd,EPOLL_CTL_DEL, current_fd, NULL);
                     close(current_fd);
-                }else
-                {
-                    char *hello = "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 12\n\nHello world!";
-                    //write(1, buf, sizeof(buf));
-                    write(current_fd, hello, strlen(hello));
-                }
-                
+                    connections++;
+                    sent_bytes = 0;
 
-                
+                }else{
+
+                    if (mode == 1){ //latency tests
+                        char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
+                        write(current_fd, header, strlen(header));
+
+                    } else if (mode == 0){ //tp testing
+                        char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %ld\r\n\r\n";
+                        char* data = NULL;
+
+                        int r = asprintf(&data, header,t_size);
+
+                        char *payload = NULL;
+
+                        payload = (char*) malloc(t_size); //allocate memory for bulk file transfer and initialise
+                        memset(payload, 0, t_size);
+
+                        strcat(data, payload);//concat payload to header for sending
+                        sent_bytes++;//used for tp tracking
+
+                        write(current_fd, data, strlen(header)+t_size);
+                        free(payload);
+                    }
+                }
             }
         }
     }
-
-
-//branch for closing fd's
-close_epfds:
-    for (int i = 0; i < n_afds; i++) {
-		close(afds[i]);
-    }
-	close(epollfd);
-
 }

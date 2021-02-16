@@ -192,20 +192,22 @@ void *polling_thread(void *data){
                         write(current_fd, header, strlen(header));
 
                     } else if (mode == 0){ //tp testing
+
                         char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %ld\r\n\r\n";
-                        char* data = NULL;
 
-                        int r = asprintf(&data, header,t_size);
+                        char* buf;
+                        int r = asprintf(&buf, header, t_size);
+                        int max_bytes = r+t_size;
+                        
+                        char* data = (char*) calloc(max_bytes, 1); //allocate memory for bulk file transfer and initialise
 
-                        char *payload = NULL;
+                        //snprintf(data, t_size, header, t_size);
+                        strcat(data, buf);
 
-                        payload = (char*) malloc(t_size); //allocate memory for bulk file transfer and initialise
-                        memset(payload, 0, t_size);
-
-                        strcat(data, payload);//concat payload to header for sending
                         sent_bytes[threadID]++;//used for tp tracking
-                        write(current_fd, data, strlen(header)+t_size);
-                        free(payload);
+                        write(current_fd, data, max_bytes);
+                        free(data);
+                        free(buf);
                     }
                 }
             }
