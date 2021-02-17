@@ -30,12 +30,13 @@ int sent_bytes[THREADS];
 int mode = 1; // 0 -  throughput testing mode
               // 1 -  latency testing mode 
 
-int t_size = 0; //data transfer size
 
+struct
 
 //struct to pass the listen socket to the threads
 struct t_args{
     int threadID;
+    char* response;
 }t_args;
 
 
@@ -61,12 +62,25 @@ static void set_sockaddr(struct sockaddr_in * addr){
 
 
 //set fd to non blocking, more portable than doing it in the socket definition
-static int setnonblocking(int sockfd)
-{
-	if (fcntl(sockfd, F_SETFD, fcntl(sockfd, F_GETFD, 0) | O_NONBLOCK) ==-1) {
-		return -1;
-	}
-	return 0;
+static int setnonblocking(int sockfd){
+    if (fcntl(sockfd, F_SETFD, fcntl(sockfd, F_GETFD, 0) | O_NONBLOCK) ==-1) {
+	return -1;
+    }
+    return 0;
+}
+
+static char* allocateBytes(int t_size){
+    char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %ld\r\n\r\n";
+    char* buf;
+
+    int r = asprintf(&buf, header, t_size);
+    int max_bytes = r+t_size;
+
+    char* data = (char*) calloc(max_bytes, 1); //allocate memory for bulk file transfer and init>
+    strcat(data, buf);
+
+    return data;
+
 }
 
 
@@ -74,9 +88,11 @@ static int setnonblocking(int sockfd)
 //and for some reason when threading you need to pass the arg struct as void
 void *polling_thread(void *data){
 
-    struct t_args *args = data;
     //unpack arguments
+    struct t_args *args = data;
     int threadID = args->threadID;
+    char* response = args->reponse;
+
 
     printf("Thread %d created\n",threadID);
 
@@ -239,6 +255,9 @@ int main(int argc, char *argv[]){
     printf("EPOLL_Q_LENGTH: %d\n", Q_LEN);
     printf("MAX_CLIENTS: %d\n", MAX_CLIENTS);
     printf("EPOLL_TIMEOUT: %d\n", EPOLL_TIMEOUT);
+
+
+    allocateBytes(t_size);
 
     //each thread has its own listener and epoll instance, the only thing they share is the port
     pthread_t threads[THREADS];
