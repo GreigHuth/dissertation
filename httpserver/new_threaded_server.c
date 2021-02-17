@@ -30,14 +30,13 @@ int sent_bytes[THREADS];
 int mode = 1; // 0 -  throughput testing mode
               // 1 -  latency testing mode 
 
-
-struct
+int t_size = 0;
 
 //struct to pass the listen socket to the threads
 struct t_args{
     int threadID;
     char* response;
-}t_args;
+};
 
 
 //this gets done a lot so a function makes sense 
@@ -69,39 +68,40 @@ static int setnonblocking(int sockfd){
     return 0;
 }
 
-static char* allocateBytes(int t_size){
-    char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %ld\r\n\r\n";
-    char* buf;
-
-    int r = asprintf(&buf, header, t_size);
-    int max_bytes = r+t_size;
-
-    char* data = (char*) calloc(max_bytes, 1); //allocate memory for bulk file transfer and init>
-    strcat(data, buf);
-
-    return data;
-
-}
-
 
 //using void as a pointer lets you point to anything you like,
 //and for some reason when threading you need to pass the arg struct as void
 void *polling_thread(void *data){
-
     //unpack arguments
     struct t_args *args = data;
     int threadID = args->threadID;
-    char* response = args->reponse;
-
-
     printf("Thread %d created\n",threadID);
 
+    //LOCAL VARIABLES
+    //socket stuff
     int listen_sock;
+    struct sockaddr_in s_addr;//addr we want to bind the socket to
+    int s_addr_len;
+
+    //epoll stuff
+    int epollfd;
+    struct epoll_event ev, events[MAX_EVENTS];
+    int nfds;
+    
+
+    //allocate data for transfer, i do it regardless but i only need it when doing tp testing
+    char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %ld\r\n\r\n";
+    char* r_buf;
+    int r = asprintf(&r_buf, header, t_size);
+    int max_bytes = r+t_size;
+    char* reply = (char*) calloc(max_bytes, 1); //allocate memory for bulk file transfer and initialise
+    strcat(reply, r_buf);
+
 
     //first we need to set up the addresses
-    struct sockaddr_in s_addr;//addr we want to bind the socket to
+    
     set_sockaddr(&s_addr);
-    int s_addr_len = sizeof(s_addr);
+    s_addr_len = sizeof(s_addr);
 
     //set up listener socket
     listen_sock = socket(AF_INET, SOCK_STREAM, 0); 
@@ -111,17 +111,11 @@ void *polling_thread(void *data){
     }
     
 
-    //set sock options that allow you to reuse addresses
-    if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int))){
+    //set sock options that allow you to reuse addresses and ports
+    if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR|SO_REUSEPORT, &(int){1}, sizeof(int))){
 		perror("setsockopt");
 		close(listen_sock);
 	}
-
-    if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEPORT, &(int){1}, sizeof(int))){
-		perror("setsockopt");
-		close(listen_sock);
-	}
-
 
     //bind listener to addr and port 
     if (bind(listen_sock, (struct sockaddr *) &s_addr, s_addr_len) < 0){
@@ -138,23 +132,21 @@ void *polling_thread(void *data){
     
 
     //create epoll instance
-    int epollfd = epoll_create1(EPOLL_CLOEXEC);
+    epollfd = epoll_create1(EPOLL_CLOEXEC);
     if (epollfd == -1) {
-               perror("cant create epoll instance");
-               exit(EXIT_FAILURE);
+        perror("cant create epoll instance");
+        exit(EXIT_FAILURE);
     }
 
-    struct epoll_event ev, events[MAX_EVENTS];
+    
+    //add listen socket to interest list
     ev.events = EPOLLIN; //type of event we are looking for
     ev.data.fd = listen_sock;
-
-    //add listen socket to interest list
     add_epoll_ctl(epollfd, listen_sock, ev);
 
     for (;;){
 
-        //returns the # of fd's ready for I/O
-        int nfds = epoll_wait(epollfd, events, MAX_EVENTS, EPOLL_TIMEOUT);
+        nfds = epoll_wait(epollfd, events, MAX_EVENTS, EPOLL_TIMEOUT);
         if (nfds == -1){
             perror("epoll_wait");
             exit(EXIT_FAILURE);
@@ -163,9 +155,9 @@ void *polling_thread(void *data){
         //loop through all the fd's to find new connections
         for (int n = 0; n < nfds; ++n){
 
-            //if the listen socket is ready to read then we have a new connection
+            
             int current_fd = events[n].data.fd;
-            if (current_fd == listen_sock){
+            if (current_fd == listen_sock){//listen socket ready means new connection
 
                 connections[threadID]++;
 
@@ -187,16 +179,15 @@ void *polling_thread(void *data){
                 add_epoll_ctl(epollfd, conn_sock, ev);
 
 
-            //if current_fd is not the listener we can do stuff
-            }else {
+            
+            }else {//if current_fd is not the listener we can do stuff
 
                 //make the buffer and 0 it
                 char buf[BUFFER_SIZE]; // read buffer
-                bzero(buf, sizeof(buf));
+                bzero(buf, sizeof(buf));//this is just sensible
 
-                //read from socket, if done or there is an error remove the fd from epoll and close it
                 int bytes_recv = read(events[n].data.fd, buf, sizeof(buf));
-                if (bytes_recv <= 0){
+                if (bytes_recv <= 0){// if recv buffer empty or error then close fd 
                     epoll_ctl(epollfd,EPOLL_CTL_DEL, current_fd, NULL);
                     close(current_fd);
                     connections[threadID]--;
@@ -208,22 +199,10 @@ void *polling_thread(void *data){
                         write(current_fd, header, strlen(header));
 
                     } else if (mode == 0){ //tp testing
-
-                        char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %ld\r\n\r\n";
-
-                        char* buf;
-                        int r = asprintf(&buf, header, t_size);
-                        int max_bytes = r+t_size;
-                        
-                        char* data = (char*) calloc(max_bytes, 1); //allocate memory for bulk file transfer and initialise
-
-                        //snprintf(data, t_size, header, t_size);
-                        strcat(data, buf);
-
                         sent_bytes[threadID]++;//used for tp tracking
-                        write(current_fd, data, max_bytes);
-                        free(data);
-                        free(buf);
+                        write(current_fd, reply, max_bytes);
+                        //free(reply); //Freeing it causes it to segfault and it works fine w/o it so :|
+                        //free(r_buf);
                     }
                 }
             }
@@ -233,6 +212,9 @@ void *polling_thread(void *data){
 
 
 int main(int argc, char *argv[]){
+
+    //LOCAL VARIABLES
+    struct t_args t_args;
     
     //arg handling
     if (argc < 2){
@@ -256,8 +238,6 @@ int main(int argc, char *argv[]){
     printf("MAX_CLIENTS: %d\n", MAX_CLIENTS);
     printf("EPOLL_TIMEOUT: %d\n", EPOLL_TIMEOUT);
 
-
-    allocateBytes(t_size);
 
     //each thread has its own listener and epoll instance, the only thing they share is the port
     pthread_t threads[THREADS];
