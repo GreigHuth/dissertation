@@ -4,7 +4,6 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/epoll.h>
 #include <sys/event.h>
 #include <netdb.h>
 #include <unistd.h>
@@ -37,20 +36,6 @@ struct t_args{
     int threadID;
     char* response;
 };
-
-
-//this gets done a lot so a function makes sense 
-static void add_epoll_ctl(int epollfd, int socket, struct epoll_event ev){
-    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, socket, &ev) == -1){
-        perror("adding listen_sock to epoll_ctl failed");
-        exit(EXIT_FAILURE);
-    }
-}
-
-
-static void add_kqueue(){
-
-}
 
 
 //set address and port for socket
@@ -88,7 +73,7 @@ void *polling_thread(void *data){
     struct sockaddr_in s_addr;//addr we want to bind the socket to
     int s_addr_len;
 
-    //epoll stuff
+    //polling stuff
     int kqfd;
     struct kevent event, t_event[MAX_EVENTS];
     int ret;
@@ -117,8 +102,9 @@ void *polling_thread(void *data){
     
 
     //set sock options that allow you to reuse addresses and ports
-    if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR|SO_REUSEPORT, &(int){1}, sizeof(int))){
+    if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEPORT, &(int){1}, sizeof(int))){
 		perror("setsockopt");
+                exit(EXIT_FAILURE);
 		close(listen_sock);
 	}
 
@@ -146,14 +132,15 @@ void *polling_thread(void *data){
     EV_SET(&event, listen_sock, EVFILT_READ, EV_ADD|EV_ENABLE,0,0,0);
 
     if (kevent(kqfd, &event, 1, NULL, 0, NULL) == -1){
-        perror("kevent failed")
+        perror("kevent failed");
         exit(EXIT_FAILURE);
     };
 
 
     for (;;){
 
-        nfds = kevent(kqfd, NULL, 0, &t_event, 1, NULL);
+
+        int nfds = kevent(kqfd, NULL, 0, t_event, 1, NULL);
         if (nfds == -1){
             perror("kevent");
             exit(EXIT_FAILURE);
@@ -180,8 +167,8 @@ void *polling_thread(void *data){
 
 
                 //set up ev for new socket
-                EV_SET(event, conn_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
-                if (kevent(kqfd, event, 1, NULL, 0, NULL) < 0){
+                EV_SET(&event, conn_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
+                if (kevent(kqfd, &event, 1, NULL, 0, NULL) < 0){
                     perror("kevent");
                     exit(EXIT_FAILURE);
                 }
@@ -250,7 +237,7 @@ int main(int argc, char *argv[]){
     for (int i=0; i < THREADS; i++){
         t_args.threadID = i;
         int rc = pthread_create(&threads[i], NULL, polling_thread, &t_args);
-        sleep(.25);//the threads dont intialise properly unless i have this here, idk why
+        sleep(1);//the threads dont intialise properly unless i have this here, idk why
         if (rc){
             printf("ERROR; return code from pthread_create() is %d\n", rc);
             exit(0);
