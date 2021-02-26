@@ -40,13 +40,10 @@ struct t_args{
 };
 
 
-static void debug(char[] message){
-	if (debug == 1){
+static void debug_msg(char* message){
+	if (DEBUG == 1){
 	    printf("%s", message);
-
-        }else{
-            return
-        }
+    }
 }
 
 
@@ -165,7 +162,7 @@ void *polling_thread(void *data){
             int current_fd = (int)t_event[n].ident;
 
             if (t_event[n].flags & EV_EOF){
-                printf("disconnected\n");
+                debug_msg("disconnected\n");
                 connections[threadID]--;
                 close(current_fd);
             
@@ -192,7 +189,6 @@ void *polling_thread(void *data){
                     perror("kevent");
                     exit(EXIT_FAILURE);
                 }
-		printf("new connection accepted%d\n",c_addr);
 
             
             }else if(t_event[n].filter == EVFILT_READ) {
@@ -210,7 +206,6 @@ void *polling_thread(void *data){
                 //}else{
 
                     if (mode == 1){ //latency tests
-                        printf("Sending response\n");
                         char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
                         write(current_fd, header, strlen(header));
 
@@ -234,7 +229,7 @@ int main(int argc, char *argv[]){
     
     //arg handling
     if (argc < 2){
-        printf("USAGE: ./new <mode> <data transfer size>\n");
+        printf("USAGE: ./new <mode> <data transfer size> <debug 0 or 1>\n");
         exit(0);
     }
 
@@ -246,6 +241,10 @@ int main(int argc, char *argv[]){
             t_size = atoi(argv[2]);
             mode = 0;
         }
+    }
+
+    if (*argv[3] == '1'){//debugging options
+        DEBUG = 1;
     }
 
     //print various configuration settings
