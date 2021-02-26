@@ -20,10 +20,12 @@
 #define MAX_CLIENTS 10000
 #define BUFFER_SIZE 1024
 #define EPOLL_TIMEOUT 0
-#define THREADS 4
+#define THREADS 1
 
 
 //Global variables 
+int DEBUG = 0;
+
 int connections[THREADS];
 int sent_bytes[THREADS];
 int mode = 1; // 0 -  throughput testing mode
@@ -36,6 +38,16 @@ struct t_args{
     int threadID;
     char* response;
 };
+
+
+static void debug(char[] message){
+	if (debug == 1){
+	    printf("%s", message);
+
+        }else{
+            return
+        }
+}
 
 
 //set address and port for socket
@@ -129,7 +141,7 @@ void *polling_thread(void *data){
         exit(EXIT_FAILURE);
     }
 
-    EV_SET(&event, listen_sock, EVFILT_READ, EV_ADD|EV_ENABLE,0,0,0);
+    EV_SET(&event, listen_sock, EVFILT_READ, EV_ADD|EV_ENABLE,0,0,NULL);
 
     if (kevent(kqfd, &event, 1, NULL, 0, NULL) == -1){
         perror("kevent failed");
@@ -140,18 +152,24 @@ void *polling_thread(void *data){
     for (;;){
 
 
-        int nfds = kevent(kqfd, NULL, 0, t_event, 1, NULL);
+        int nfds = kevent(kqfd, NULL, 0, t_event, MAX_EVENTS, NULL);
         if (nfds == -1){
             perror("kevent");
             exit(EXIT_FAILURE);
         }
-
+        
         //loop through all the fd's to find new connections
         for (int n = 0; n < nfds; n++){
 
             
-            int current_fd = t_event[n].ident;
-            if (current_fd == listen_sock){//listen socket ready means new connection
+            int current_fd = (int)t_event[n].ident;
+
+            if (t_event[n].flags & EV_EOF){
+                printf("disconnected\n");
+                connections[threadID]--;
+                close(current_fd);
+            
+            } else if (current_fd == listen_sock){//listen socket ready means new connection
 
                 connections[threadID]++;
 
@@ -166,28 +184,33 @@ void *polling_thread(void *data){
                 }
 
 
+                setnonblocking(current_fd);
+
                 //set up ev for new socket
                 EV_SET(&event, conn_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
                 if (kevent(kqfd, &event, 1, NULL, 0, NULL) < 0){
                     perror("kevent");
                     exit(EXIT_FAILURE);
                 }
+		printf("new connection accepted%d\n",c_addr);
 
             
-            }else {//if current_fd is not the listener we can do stuff
+            }else if(t_event[n].filter == EVFILT_READ) {
 
                 //make the buffer and 0 it
                 char buf[BUFFER_SIZE]; // read buffer
                 bzero(buf, sizeof(buf));//this is just sensible
 
                 int bytes_recv = read(current_fd, buf, sizeof(buf));
-                if (bytes_recv <= 0){// if recv buffer empty or error then close fd 
-                    close(current_fd);
-                    connections[threadID]--;
-                    sent_bytes[threadID] = 0;
-                }else{
+
+                //if (bytes_recv <= 0){// if recv buffer empty or error then close fd 
+                //    close(current_fd);
+                //    connections[threadID]--;
+                //    sent_bytes[threadID] = 0;
+                //}else{
 
                     if (mode == 1){ //latency tests
+                        printf("Sending response\n");
                         char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
                         write(current_fd, header, strlen(header));
 
@@ -197,7 +220,7 @@ void *polling_thread(void *data){
                         //free(reply); //Freeing it causes it to segfault and it works fine w/o it so :|
                         //free(r_buf);
                     }
-                }
+                //}
             }
         }
     }
