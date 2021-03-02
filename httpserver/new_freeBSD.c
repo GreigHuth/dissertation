@@ -207,11 +207,11 @@ void *polling_thread(void *data){
 
                 int bytes_recv = read(current_fd, buf, sizeof(buf));
 
-                //if (bytes_recv <= 0){// if recv buffer empty or error then close fd 
-                //    close(current_fd);
-                //    connections[threadID]--;
-                //    sent_bytes[threadID] = 0;
-                //}else{
+                if (bytes_recv <= 0){// if recv buffer empty or error then close fd 
+                    close(current_fd);
+                    connections[threadID]--;
+                    sent_bytes[threadID] = 0;
+                }else{
 
                     if (mode == 1){ //latency tests
                         char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
