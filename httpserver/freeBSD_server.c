@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/event.h>
+#include <sys/timespec.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -19,8 +20,8 @@
 #define MAX_EVENTS 32
 #define MAX_CLIENTS 10000
 #define BUFFER_SIZE 1024
-#define EPOLL_TIMEOUT 0
-#define THREADS 1
+#define THREADS 4
+#define KQ_TIMEOUT 1
 
 
 //Global variables 
@@ -36,13 +37,12 @@ int t_size = 0;
 //struct to pass the listen socket to the threads
 struct t_args{
     int threadID;
-    char* response;
 };
 
 
 static void debug_msg(char* message){
-	if (DEBUG == 1){
-	    printf("%s", message);
+    if (DEBUG == 1){
+        printf("%s", message);
     }
 }
 
@@ -89,6 +89,8 @@ void *polling_thread(void *data){
     
 
     //allocate data for transfer, i do it regardless but i only need it when doing tp testing
+    //doing it for each thread is inefficient but it makes sense since it means i dont have to worry
+    //    about threads sharing the memory
     char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %ld\r\n\r\n";
     char* r_buf;
     int r = asprintf(&r_buf, header, t_size);
@@ -112,10 +114,10 @@ void *polling_thread(void *data){
 
     //set sock options that allow you to reuse addresses and ports
     if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEPORT, &(int){1}, sizeof(int))){
-		perror("setsockopt");
-                exit(EXIT_FAILURE);
-		close(listen_sock);
-	}
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+	close(listen_sock);
+    }
 
     //bind listener to addr and port 
     if (bind(listen_sock, (struct sockaddr *) &s_addr, s_addr_len) < 0){
@@ -129,6 +131,7 @@ void *polling_thread(void *data){
         perror("listening failed");
         exit(EXIT_FAILURE);
     }
+    printf("Thread %d listening on socket %d\n", threadID, listen_sock);
     
 
     //create kqueue
@@ -143,13 +146,13 @@ void *polling_thread(void *data){
     if (kevent(kqfd, &event, 1, NULL, 0, NULL) == -1){
         perror("kevent failed");
         exit(EXIT_FAILURE);
-    };
+    }
 
 
     for (;;){
 
-
-        int nfds = kevent(kqfd, NULL, 0, t_event, MAX_EVENTS, NULL);
+	struct timespec timeout = {KQ_TIMEOUT, 0};//timeout
+        int nfds = kevent(kqfd, NULL, 0, t_event, MAX_EVENTS, &timeout);
         if (nfds == -1){
             perror("kevent");
             exit(EXIT_FAILURE);
@@ -157,7 +160,6 @@ void *polling_thread(void *data){
         
         //loop through all the fd's to find new connections
         for (int n = 0; n < nfds; n++){
-
             
             int current_fd = (int)t_event[n].ident;
 
@@ -169,7 +171,7 @@ void *polling_thread(void *data){
             } else if (current_fd == listen_sock){//listen socket ready means new connection
 
                 connections[threadID]++;
-
+                printf("connection accepted on thread: %d\n", threadID);
                 struct sockaddr_in c_addr;//address of the client
                 int c_addr_len = sizeof(c_addr);
 
@@ -191,7 +193,7 @@ void *polling_thread(void *data){
                 }
 
             
-            }else if(t_event[n].filter == EVFILT_READ) {
+            }else {
 
                 //make the buffer and 0 it
                 char buf[BUFFER_SIZE]; // read buffer
@@ -199,11 +201,11 @@ void *polling_thread(void *data){
 
                 int bytes_recv = read(current_fd, buf, sizeof(buf));
 
-                //if (bytes_recv <= 0){// if recv buffer empty or error then close fd 
-                //    close(current_fd);
-                //    connections[threadID]--;
-                //    sent_bytes[threadID] = 0;
-                //}else{
+                if (bytes_recv <= 0){// if recv buffer empty or error then close fd 
+                    close(current_fd);
+                    connections[threadID]--;
+                    sent_bytes[threadID] = 0;
+                }else{
 
                     if (mode == 1){ //latency tests
                         char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
@@ -215,7 +217,7 @@ void *polling_thread(void *data){
                         //free(reply); //Freeing it causes it to segfault and it works fine w/o it so :|
                         //free(r_buf);
                     }
-                //}
+                }
             }
         }
     }
@@ -249,12 +251,11 @@ int main(int argc, char *argv[]){
 
     //print various configuration settings
     printf("PORT: %d\n", PORT);
-    printf("EPOLL_Q_LENGTH: %d\n", Q_LEN);
+    printf("Q_LENGTH: %d\n", Q_LEN);
     printf("MAX_CLIENTS: %d\n", MAX_CLIENTS);
-    printf("EPOLL_TIMEOUT: %d\n", EPOLL_TIMEOUT);
+    printf("TIMEOUT: %d\n", KQ_TIMEOUT);
 
-
-    //each thread has its own listener and epoll instance, the only thing they share is the port
+    //each thread has its own listener and kqueue instance, the only thing they share is the port
     pthread_t threads[THREADS];
     for (int i=0; i < THREADS; i++){
         t_args.threadID = i;
