@@ -36,7 +36,7 @@ int t_size = 0;
 //struct to pass the listen socket to the threads
 struct t_args{
     int threadID;
-    int listen_sock
+    int listen_sock;
 };
 
 //set address and port for socket
@@ -55,6 +55,10 @@ static int setup_listener(){
     int listen_sock;
     struct sockaddr_in s_addr;//addr we want to bind the socket to
     int s_addr_len;
+
+    set_sockaddr(&s_addr);
+    s_addr_len = sizeof(s_addr);
+
 
     //set up listener socket
     listen_sock = socket(AF_INET, SOCK_STREAM, 0); 
@@ -84,7 +88,7 @@ static int setup_listener(){
         exit(EXIT_FAILURE);
     }
 
-    return listen_sock
+    return listen_sock;
 
 }
 
@@ -131,9 +135,7 @@ void *polling_thread(void *data){
 
     //first we need to set up the addresses
     
-    set_sockaddr(&s_addr);
-    s_addr_len = sizeof(s_addr);
-
+  
     
     
 
