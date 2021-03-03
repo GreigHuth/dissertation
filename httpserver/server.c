@@ -174,10 +174,6 @@ void *polling_thread(void *data){
         struct kevent evts[MAX_EVENTS];
     #endif
 
-    int reply_len;
-    char* reply;
-
-
     //allocate data for transfer, i do it regardless but i only need it when doing tp testing
     char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %ld\r\n\r\n";
     char* r_buf;
