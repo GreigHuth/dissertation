@@ -236,8 +236,6 @@ void *polling_thread(void *data){
             nfds = kevent(pfd, NULL, 0, evts, MAX_EVENTS, &timeout);
         #endif
 
-        printf("nfds: %d\n");
-
         //loop through all the fd's to find new connections
         for (int n = 0; n < nfds; ++n){
 
@@ -248,12 +246,11 @@ void *polling_thread(void *data){
 
             #endif
             
-            
             if (current_fd == listen_sock){//listen socket ready means new connection
 
                 //printf("accepting connection\n");
                 accept_conn(current_fd, pfd);
-		update_tracker(threadID, 1);
+		        update_tracker(threadID, 1);
                 continue;
 
             }else {//if current_fd is not the listener we can do stuff
@@ -266,7 +263,6 @@ void *polling_thread(void *data){
                 if (bytes_recv <= 0){// if recv buffer empty or error then close fd 
                     close(current_fd);
                     update_tracker(threadID, -1);
-                    sent_bytes[threadID] = 0;
                 }else{
 
                     if (mode == 1){ //latency tests
@@ -274,7 +270,6 @@ void *polling_thread(void *data){
                         write(current_fd, header, strlen(header));
 
                     } else if (mode == 0){ //tp testing
-                        sent_bytes[threadID]++;//used for tp tracking
                         write(current_fd, reply, max_bytes);
                         
                     }
