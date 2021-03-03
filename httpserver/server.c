@@ -82,7 +82,6 @@ static int setup_listener(){
     set_sockaddr(&s_addr);
     s_addr_len = sizeof(s_addr);
 
-
     //set up listener socket
     listen_sock = socket(AF_INET, SOCK_STREAM, 0); 
     if (listen_sock == 0){ 
@@ -91,7 +90,7 @@ static int setup_listener(){
     }
     //set sock options that allow you to reuse addresses and ports
     if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEPORT, &(int){1}, sizeof(int))){
-	perror("setsockopt");
+	    perror("setsockopt");
         exit(EXIT_FAILURE);
         close(listen_sock);
     }
@@ -136,7 +135,7 @@ static void accept_conn(int fd, int pfd){
 
         ev.events = EPOLLIN;
         ev.data.fd = conn_sock;
-        epoll_ctl(pfd, EPOLL_CTL_ADD, socket, &ev);
+        epoll_ctl(pfd, EPOLL_CTL_ADD, conn_sock, &ev);
         
     #else
 
@@ -235,6 +234,7 @@ void *polling_thread(void *data){
                 int current_fd = evts[n].data.fd;
             #else  
                 int current_fd = evts[n].ident;
+                printf("thread: %d flags:%d\n", threadID, evts[n].flags);
 
             #endif
             
