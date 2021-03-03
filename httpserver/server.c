@@ -243,7 +243,7 @@ void *polling_thread(void *data){
                 //printf("accepting connection\n");
                 accept_conn(current_fd, pfd);
 		        update_tracker(threadID, 1);
-                continue;
+                break;
 
             }else {//if current_fd is not the listener we can do stuff
                 //make the buffer and 0 it
