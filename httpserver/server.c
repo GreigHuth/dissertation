@@ -177,6 +177,7 @@ void *polling_thread(void *data){
     #endif
 
     int reply_len;
+    char* reply;
 
     if (mode == 1){
         //allocate data for transfer, i do it regardless but i only need it when doing tp testing
@@ -241,6 +242,7 @@ void *polling_thread(void *data){
         #ifdef linux
             nfds = epoll_wait(pfd, evts, MAX_EVENTS, TIMEOUT);
         #else
+            struct timespec timeout = {TIMEOUT, 0};
             nfds = kevent(pfd, NULL, 0, evts, MAX_EVENTS, TIMEOUT);
         #endif
 
