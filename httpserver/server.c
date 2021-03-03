@@ -271,7 +271,6 @@ void *polling_thread(void *data){
 
                 while(bytes_recv){
                     write(current_fd, reply, reply_len);
-                    bytes_recv = 0;
                 }
                 if (bytes_recv <= 0){// if recv buffer empty or error then close fd 
                     close(current_fd);
