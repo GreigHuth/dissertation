@@ -25,8 +25,8 @@
 
 //Global variables 
 int DEBUG = 0;
-int c_lock = 0;
-int connections;
+pthread_mutex_lock_t lock;
+int connections[THREADS];
 int sent_bytes[THREADS];
 int mode = 1; // 0 -  throughput testing mode
               // 1 -  latency testing mode 
@@ -39,25 +39,10 @@ struct t_args{
     int listen_sock;
 };
 
-static int get_lock(){
-    if (c_lock == 0){ 
-        c_lock = 1;
-        return 1;
-    }else{
-        return 0 ;
-    }
-}
-
-static int release_lock(){
-    if (c_lock == 1){
-        c_lock = 0;
-    }
-}
-
 static void update_tracker(int threadID, int value){
-    while(get_lock()){}; //spin until the lock is free
-    connections += value;
-    release_lock();
+    pthread_mutex_lock(&lock);
+    connections[threadID] += value;
+    pthread_mutex_unlock(&lock);
 }
 
 
@@ -245,8 +230,6 @@ int main(int argc, char *argv[]){
     struct t_args t_args;
     t_args.listen_sock = setup_listener();
 
-
-
     
     //arg handling
     if (argc < 2){
@@ -276,11 +259,7 @@ int main(int argc, char *argv[]){
 
     //each thread has its own listener and epoll instance, the only thing they share is the port
     pthread_t threads[THREADS];
-    cpu_set_t cpuset;
-
-    for (int i =0; i < THREADS; i++){
-        CPU_SET(i, &cpuset);
-    }
+        
 
     for (int i=0; i < THREADS; i++){
         t_args.threadID = i;
@@ -289,22 +268,16 @@ int main(int argc, char *argv[]){
         if (rc){
             printf("ERROR; return code from pthread_create() is %d\n", rc);
             exit(0);
-        }
-        //set cpu affinity
-        rc = pthread_setaffinity_np(&threads[i], sizeof(cpuset), &cpuset );
-        if (rc != 0){
-            perror("pthread_setaffinity");
-            exit(EXIT_FAILURE);
-        }
-
+        }    
     }
 
     for (;;){
-        printf("Total Connections: %d\n", connections);
         for (int i=0; i < THREADS; i++){
-            printf("thread %d requests: %d\n",i, sent_bytes[i]);            
+            printf("Total Connections: %d\n", connections[i]);
+//            printf("thread %d requests: %d\n",i, sent_bytes[i]);            
         }
         sleep(1);
         system("clear");
     }
 }
+
