@@ -123,7 +123,7 @@ void *polling_thread(void *data){
     }
     //polling stuff
     int kqfd;
-    struct kevent event[MAX_EVENTS], t_event[MAX_EVENTS];
+    struct kevent event, t_event[MAX_EVENTS];
 
     //allocate data for transfer, i do it regardless but i only need it when doing tp testing
     char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %ld\r\n\r\n";
@@ -140,20 +140,20 @@ void *polling_thread(void *data){
         exit(EXIT_FAILURE);
     }
 
-    EV_SET(event, listen_sock, EVFILT_READ, EV_ADD,0,0,NULL);
+    EV_SET(&event, listen_sock, EVFILT_READ, EV_ADD,0,0,NULL);
 
     //attach event to queue
-    if (kevent(kqfd, event, 1, NULL, 0, NULL) == -1){
+    if (kevent(kqfd, &event, 1, NULL, 0, NULL) == -1){
         perror("kevent failed");
        exit(EXIT_FAILURE);
-    };
+    }
 
 
     for (;;){
 
         struct timespec timeout = {KQUEUE_TIMEOUT, 0};
 
-        int nfds = kevent(kqfd, NULL, 0, t_event, MAX_EVENTS, NULL);
+        int nfds = kevent(kqfd, NULL,0, t_event, MAX_EVENTS, NULL);
 
         if (nfds == -1){
             perror("kevent");
@@ -187,8 +187,8 @@ void *polling_thread(void *data){
                 setnonblocking(conn_sock);
 
                 //set up ev for new socket
-                EV_SET(event, conn_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
-                if (kevent(kqfd, event, 1, NULL, 0, NULL) < 0){
+                EV_SET(&event, conn_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
+                if (kevent(kqfd, &event, 1, NULL, 0, NULL) < 0){
                     perror("kevent");
                     exit(EXIT_FAILURE);
                 }
@@ -214,8 +214,7 @@ void *polling_thread(void *data){
                     } else if (mode == 0){ //tp testing
                         sent_bytes[threadID]++;//used for tp tracking
                         write(current_fd, reply, max_bytes);
-                        //free(reply); //Freeing it causes it to segfault and it works fine w/o it so :|
-                        //free(r_buf);
+                        
                     }
                 }
             }else{
@@ -258,7 +257,7 @@ int main(int argc, char *argv[]){
     printf("KQUEUE_TIMEOUT: %d\n", KQUEUE_TIMEOUT);
 
 
-    //each thread has its own listener and epoll instance, the only thing they share is the port
+
     pthread_t threads[THREADS];
         
 
