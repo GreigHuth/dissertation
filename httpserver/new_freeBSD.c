@@ -245,6 +245,8 @@ int main(int argc, char *argv[]){
     struct t_args t_args;
     t_args.listen_sock = setup_listener();
 
+
+
     
     //arg handling
     if (argc < 2){
@@ -274,6 +276,12 @@ int main(int argc, char *argv[]){
 
     //each thread has its own listener and epoll instance, the only thing they share is the port
     pthread_t threads[THREADS];
+    cpu_set_t cpuset;
+
+    for (int i =0; i < THREADS; i++){
+        CPU_SET(i, &cpuset);
+    }
+
     for (int i=0; i < THREADS; i++){
         t_args.threadID = i;
         int rc = pthread_create(&threads[i], NULL, polling_thread, &t_args);
@@ -282,6 +290,13 @@ int main(int argc, char *argv[]){
             printf("ERROR; return code from pthread_create() is %d\n", rc);
             exit(0);
         }
+        //set cpu affinity
+        rc = pthread_setaffinity_np(&threads[i], sizeof(cpuset), &cpuset );
+        if (rc != 0){
+            perror("pthread_setaffinity");
+            exit(EXIT_FAILURE);
+        }
+
     }
 
     for (;;){

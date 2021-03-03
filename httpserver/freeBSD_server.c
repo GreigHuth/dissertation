@@ -151,7 +151,7 @@ void *polling_thread(void *data){
 
     for (;;){
 
-	struct timespec timeout = {KQ_TIMEOUT, 0};//timeout
+	    struct timespec timeout = {KQ_TIMEOUT, 0};//timeout
         int nfds = kevent(kqfd, NULL, 0, t_event, MAX_EVENTS, &timeout);
         if (nfds == -1){
             perror("kevent");
