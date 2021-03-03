@@ -342,8 +342,8 @@ int main(int argc, char *argv[]){
 
         #ifdef linux
         #else
-            rc = pthread_setaffinity_np(thread[i], sizeof(cpuset), &cpuset);
-            if (s != 0)
+            rc = pthread_setaffinity_np(threads[i], sizeof(cpuset), &cpuset);
+            if (rc != 0)
                perror("pthread_setaffinity_np");
         #endif
     }
