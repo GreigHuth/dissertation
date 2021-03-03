@@ -13,16 +13,16 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 
-#ifdef __FreeBSD__
+
+
+#ifdef linux
+#include <sys/epoll.h>
+
+#else 
 #include <sys/cpuset.h>
 #include <pthread_np.h> 
 #include <sys/sysctl.h>	
 #endif
-
-#ifdef __linux__
-#include <sys/epoll.h>
-#endif /* __linux__ */
-
 
 #define PORT 1234
 #define Q_LEN 16
