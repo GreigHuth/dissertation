@@ -21,6 +21,7 @@
 #else 
 #include <sys/cpuset.h>
 #include <pthread_np.h> 
+#include <sys/event.h>
 #include <sys/sysctl.h>	
 #endif
 
