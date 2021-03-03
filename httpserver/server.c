@@ -13,8 +13,6 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 
-
-
 #ifdef linux
 #include <sys/epoll.h>
 
@@ -29,8 +27,8 @@
 #define Q_LEN 16
 #define MAX_EVENTS 1024
 #define BUFFER_SIZE 1024
-#define TIMEOUT 10
-#define THREADS 4
+#define TIMEOUT 0
+#define THREADS 1
 
 
 //Global variables 
@@ -246,6 +244,8 @@ void *polling_thread(void *data){
             nfds = kevent(pfd, NULL, 0, evts, MAX_EVENTS, &timeout);
         #endif
 
+        printf("nfds: %d\n");
+
         //loop through all the fd's to find new connections
         for (int n = 0; n < nfds; ++n){
 
@@ -259,11 +259,12 @@ void *polling_thread(void *data){
             
             if (current_fd == listen_sock){//listen socket ready means new connection
 
+                //printf("accepting connection\n");
                 accept_conn(current_fd, pfd);
-                break;
+		update_tracker(threadID, 1);
+                continue;
 
             }else {//if current_fd is not the listener we can do stuff
-
                 //make the buffer and 0 it
                 char buf[BUFFER_SIZE]; // read buffer
                 bzero(buf, sizeof(buf));//this is just sensible
@@ -272,12 +273,12 @@ void *polling_thread(void *data){
                 while(bytes_recv){
                     write(current_fd, reply, reply_len);
                     bytes_recv = read(current_fd, buf, sizeof(buf));     
-                    printf("bytes_recv: %d", bytes_recv);       
+                    printf("bytes_recv: %d\n", bytes_recv);       
                 
                 }
                 if (bytes_recv <= 0){// if recv buffer empty or error then close fd 
                     close(current_fd);
-                    connections[threadID]--;
+                    update_tracker(threadID, -1);
                     sent_bytes[threadID] = 0;
                 }else{
 
