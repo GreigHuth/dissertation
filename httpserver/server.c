@@ -48,20 +48,21 @@ struct t_args{
     int listen_sock;
 };
 
+//set fd to non blocking, more portable than doing it in the socket definition
+static int setnonblocking(int sockfd){
+    if (fcntl(sockfd, F_SETFD, fcntl(sockfd, F_GETFD, 0) | O_NONBLOCK) ==-1) {
+	return -1;
+    }
+    return 0;
+}
+
+
 static void update_tracker(int threadID, int value){
     pthread_mutex_lock(&lock);
     connections[threadID] += value;
     pthread_mutex_unlock(&lock);
 }
 
-
-//this gets done a lot so a function makes sense 
-static void add_epoll_ctl(int pfd, int socket, struct epoll_event ev){
-    if (epoll_ctl(pfd, EPOLL_CTL_ADD, socket, &ev) == -1){
-        perror("adding listen_sock to epoll_ctl failed");
-        exit(EXIT_FAILURE);
-    }
-}
 
 static int setup_listener(){
     int listen_sock;
@@ -99,7 +100,6 @@ static int setup_listener(){
 }
 
 
-
 static void accept_conn(int fd, int pfd){
 
     #ifdef linux
@@ -126,16 +126,16 @@ static void accept_conn(int fd, int pfd){
 
         ev.events = EPOLLIN;
         ev.data.fd = conn_sock;
-        add_epoll_ctl(pfd, conn_sock, ev);
+        epoll_ctl(pfd, EPOLL_CTL_ADD, socket, &ev);
         
     #else
 
-        EV_SET(&event, conn_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
-        kevent(pfd, &event, 1, NULL, 0, NULL)
+        EV_SET(&ev, conn_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
+        kevent(pfd, &ev, 1, NULL, 0, NULL);
 
     #endif
-}
 
+}
 
 
 //set address and port for socket
@@ -149,14 +149,6 @@ static void set_sockaddr(struct sockaddr_in * addr){
     addr->sin_port = htons(PORT);
 }
 
-
-//set fd to non blocking, more portable than doing it in the socket definition
-static int setnonblocking(int sockfd){
-    if (fcntl(sockfd, F_SETFD, fcntl(sockfd, F_GETFD, 0) | O_NONBLOCK) ==-1) {
-	return -1;
-    }
-    return 0;
-}
 
 
 //using void as a pointer lets you point to anything you like,
@@ -221,7 +213,8 @@ void *polling_thread(void *data){
         //add listen socket to interest list
         ev.events = EPOLLIN; //type of event we are looking for
         ev.data.fd = listen_sock;
-        add_epoll_ctl(pfd, ev.data.fd, ev);
+        epoll_ctl(pfd, EPOLL_CTL_ADD, ev.data.fd, &ev);
+    
 
     #else
         //create kqueue
@@ -235,7 +228,7 @@ void *polling_thread(void *data){
 
         EV_SET(&ev, listen_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
         //attach event to queue
-        if (kevent(pfd, &event, 1, NULL, 0, NULL) == -1){
+        if (kevent(pfd, &ev, 1, NULL, 0, NULL) == -1){
             perror("kevent failed");
         exit(EXIT_FAILURE);
         }
