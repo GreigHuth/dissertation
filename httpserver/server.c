@@ -28,7 +28,7 @@
 #define MAX_EVENTS 1024
 #define BUFFER_SIZE 1024
 #define TIMEOUT 0
-#define THREADS 1
+#define THREADS 4
 
 
 //Global variables 
@@ -88,6 +88,8 @@ static int setup_listener(){
         perror("socket failed");
         exit(EXIT_FAILURE);
     }
+
+    
     //set sock options that allow you to reuse addresses and ports
     if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEPORT, &(int){1}, sizeof(int))){
 	    perror("setsockopt");
@@ -130,6 +132,8 @@ static void accept_conn(int fd, int pfd){
     }
 
     setnonblocking(conn_sock);
+    struct linger sl = {.l_onoff = 1, .l_linger = 0};
+    setsockopt(fd, SOL_SOCKET, SO_LINGER, &sl, sizeof(sl));
 
     #ifdef linux
 
