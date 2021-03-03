@@ -57,6 +57,17 @@ static int setnonblocking(int sockfd){
     return 0;
 }
 
+//set address and port for socket
+static void set_sockaddr(struct sockaddr_in * addr){
+    addr->sin_family = AF_INET;
+
+    addr->sin_addr.s_addr = INADDR_ANY;//binds socket to all available interfaces
+    //manual addr assignment: inet_aton('127.0.0.1', addr->sin_addr.s_addr);
+
+    //htons convers byte order from host to network order 
+    addr->sin_port = htons(PORT);
+}
+
 
 static void update_tracker(int threadID, int value){
     pthread_mutex_lock(&lock);
@@ -139,16 +150,6 @@ static void accept_conn(int fd, int pfd){
 }
 
 
-//set address and port for socket
-static void set_sockaddr(struct sockaddr_in * addr){
-    addr->sin_family = AF_INET;
-
-    addr->sin_addr.s_addr = INADDR_ANY;//binds socket to all available interfaces
-    //manual addr assignment: inet_aton('127.0.0.1', addr->sin_addr.s_addr);
-
-    //htons convers byte order from host to network order 
-    addr->sin_port = htons(PORT);
-}
 
 
 
@@ -175,7 +176,6 @@ void *polling_thread(void *data){
         struct kevent evts[MAX_EVENTS];
     #endif
 
-    char* reply;
     int reply_len;
 
     if (mode == 1){
@@ -184,12 +184,12 @@ void *polling_thread(void *data){
         char* r_buf;
         int r = asprintf(&r_buf, header, t_size);
         int max_bytes = r+t_size;
-        reply = (char*) calloc(max_bytes, 1); //allocate memory for bulk file transfer and initialise
+        char* reply = (char*) calloc(max_bytes, 1); //allocate memory for bulk file transfer and initialise
         strcat(reply, r_buf);
         reply_len = max_bytes;
 
     } else{
-        *reply = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
+        char *reply = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
         reply_len = strlen(reply);             
     }
 
@@ -241,7 +241,7 @@ void *polling_thread(void *data){
         #ifdef linux
             nfds = epoll_wait(pfd, evts, MAX_EVENTS, TIMEOUT);
         #else
-            nfds = kevent(pfd, NULL, 0 evts, MAX_EVENTS, TIMEOUT);
+            nfds = kevent(pfd, NULL, 0, evts, MAX_EVENTS, TIMEOUT);
         #endif
 
         //loop through all the fd's to find new connections
