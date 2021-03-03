@@ -323,14 +323,18 @@ int main(int argc, char *argv[]){
 
     //each thread has its own listener and epoll instance, the only thing they share is the port
     pthread_t threads[THREADS];
-    for (int i=0; i < THREADS; i++){
-        t_args.threadID = i;
-        int rc = pthread_create(&threads[i], NULL, polling_thread, &t_args);
-        sleep(.25);//the threads dont intialise properly unless i have this here, idk why
+
+     for (int i=0; i < THREADS; i++){
+   
+        struct t_args* args = malloc(sizeof(*args));
+        args->threadID = i;
+
+        int rc = pthread_create(&threads[i], NULL, polling_thread, (void*)args);
+        sleep(0.1);//the threads dont intialise properly unless i have this here, idk why
         if (rc){
             printf("ERROR; return code from pthread_create() is %d\n", rc);
             exit(0);
-        }
+        }    
     }
 
     for (;;){
