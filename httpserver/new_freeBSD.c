@@ -20,12 +20,12 @@
 #define MAX_CLIENTS 10000
 #define BUFFER_SIZE 1024
 #define KQUEUE_TIMEOUT 100
-#define THREADS 4
+#define THREADS 2
 
 
 //Global variables 
 int DEBUG = 0;
-pthread_mutex_lock_t lock;
+pthread_mutex_t lock;
 int connections[THREADS];
 int sent_bytes[THREADS];
 int mode = 1; // 0 -  throughput testing mode
@@ -114,11 +114,13 @@ static int setnonblocking(int sockfd){
 //and for some reason when threading you need to pass the arg struct as void
 void *polling_thread(void *data){
     //unpack arguments
-    struct t_args *args = data;
-    int threadID = args->threadID;
-    int listen_sock = args->listen_sock;
-    printf("Thread %d created\n",threadID);
+    struct t_args args = *((struct t_args*) data);
+    int threadID = args.threadID;
+    int listen_sock = args.listen_sock;
 
+    if (threadID == 1){
+        printf("Thread %d created\n",threadID);
+    }
     //polling stuff
     int kqfd;
     struct kevent event[MAX_EVENTS], t_event[MAX_EVENTS];
@@ -157,10 +159,11 @@ void *polling_thread(void *data){
             perror("kevent");
             exit(EXIT_FAILURE);
         }
-        
+
+	printf("Thread %d has %d events ready\n", threadID, nfds);
         //loop through all the fd's to find new connections
         for (int n = 0; n < nfds; n++){
-
+            
             int current_fd = (int)t_event[n].ident;
 
             if (t_event[n].flags & EV_EOF){
@@ -227,9 +230,7 @@ void *polling_thread(void *data){
 int main(int argc, char *argv[]){
 
     //LOCAL VARIABLES
-    struct t_args t_args;
-    t_args.listen_sock = setup_listener();
-
+    int listen_sock = setup_listener();
     
     //arg handling
     if (argc < 2){
@@ -262,8 +263,12 @@ int main(int argc, char *argv[]){
         
 
     for (int i=0; i < THREADS; i++){
-        t_args.threadID = i;
-        int rc = pthread_create(&threads[i], NULL, polling_thread, &t_args);
+   
+        struct t_args* args = malloc(sizeof(*args));
+        args->threadID = i;
+        args->listen_sock = listen_sock;
+
+        int rc = pthread_create(&threads[i], NULL, polling_thread, (void*)args);
         sleep(0.1);//the threads dont intialise properly unless i have this here, idk why
         if (rc){
             printf("ERROR; return code from pthread_create() is %d\n", rc);
