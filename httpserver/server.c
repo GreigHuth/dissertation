@@ -320,6 +320,18 @@ int main(int argc, char *argv[]){
 
     //each thread has its own listener and epoll instance, the only thing they share is the port
     pthread_t threads[THREADS];
+    
+    //set cpu affinity
+
+    #ifdef linux
+
+    #else
+        cpuset_t cpuset;
+        CPU_ZERO(&cpuset);
+        for (int j = 0; j < THREADS; j++)
+               CPU_SET(j, &cpuset);
+    #endif
+
 
      for (int i=0; i < THREADS; i++){
    
@@ -327,11 +339,18 @@ int main(int argc, char *argv[]){
         args->threadID = i;
 
         int rc = pthread_create(&threads[i], NULL, polling_thread, (void*)args);
-        sleep(0.1);//the threads dont intialise properly unless i have this here, idk why
+
         if (rc){
             printf("ERROR; return code from pthread_create() is %d\n", rc);
             exit(0);
         }    
+
+        #ifdef linux
+        #else
+            rc = pthread_setaffinity_np(thread[i], sizeof(cpuset), &cpuset);
+            if (s != 0)
+               perror("pthread_setaffinity_np");
+        #endif
     }
 
     for (;;){
