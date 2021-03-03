@@ -243,7 +243,7 @@ void *polling_thread(void *data){
             nfds = epoll_wait(pfd, evts, MAX_EVENTS, TIMEOUT);
         #else
             struct timespec timeout = {TIMEOUT, 0};
-            nfds = kevent(pfd, NULL, 0, evts, MAX_EVENTS, TIMEOUT);
+            nfds = kevent(pfd, NULL, 0, evts, MAX_EVENTS, &timeout);
         #endif
 
         //loop through all the fd's to find new connections
