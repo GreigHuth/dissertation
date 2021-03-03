@@ -181,7 +181,7 @@ void *polling_thread(void *data){
     int max_bytes = r+t_size;
     char* reply = (char*) calloc(max_bytes, 1); //allocate memory for bulk file transfer and initialise
     strcat(reply, r_buf);
-    reply_len = max_bytes;
+    int reply_len = max_bytes;
 
 
 
