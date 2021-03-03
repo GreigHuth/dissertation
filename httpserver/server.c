@@ -157,13 +157,8 @@ void *polling_thread(void *data){
     //unpack arguments
     struct t_args *args = data;
     int threadID = args->threadID;
+    int listen_sock = args->listen_sock;
     printf("Thread %d created\n",threadID);
-
-    //LOCAL VARIABLES
-    //socket stuff
-    int listen_sock;
-    struct sockaddr_in s_addr;//addr we want to bind the socket to
-    int s_addr_len;
 
     int pfd;  //polling fd
     int nfds; 
@@ -187,10 +182,7 @@ void *polling_thread(void *data){
 
     //first we need to set up the addresses
     
-    set_sockaddr(&s_addr);
-    s_addr_len = sizeof(s_addr);
-
-    listen_sock = setup_listener();
+    
     
     #ifdef linux
         //create epoll instance
@@ -282,9 +274,19 @@ void *polling_thread(void *data){
 
 int main(int argc, char *argv[]){
 
-    //LOCAL VARIABLES
+    //thread arguments
     struct t_args t_args;
+
+    //LOCAL VARIABLES
+    //socket stuff
+    int listen_sock = setup_listener();
+    struct sockaddr_in s_addr;//addr we want to bind the socket to
+    int s_addr_len;
     
+    set_sockaddr(&s_addr);
+    s_addr_len = sizeof(s_addr);
+
+
     //arg handling
     if (argc < 2){
         printf("USAGE: ./new <mode> <data transfer size>\n");
@@ -332,6 +334,7 @@ int main(int argc, char *argv[]){
    
         struct t_args* args = malloc(sizeof(*args));
         args->threadID = i;
+        args->listen_sock = listen_sock;
 
         int rc = pthread_create(&threads[i], NULL, polling_thread, (void*)args);
 
