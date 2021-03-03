@@ -177,20 +177,16 @@ void *polling_thread(void *data){
     int reply_len;
     char* reply;
 
-    if (mode == 1){
-        //allocate data for transfer, i do it regardless but i only need it when doing tp testing
-        char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %ld\r\n\r\n";
-        char* r_buf;
-        int r = asprintf(&r_buf, header, t_size);
-        int max_bytes = r+t_size;
-        char* reply = (char*) calloc(max_bytes, 1); //allocate memory for bulk file transfer and initialise
-        strcat(reply, r_buf);
-        reply_len = max_bytes;
 
-    } else{
-        char *reply = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
-        reply_len = strlen(reply);             
-    }
+    //allocate data for transfer, i do it regardless but i only need it when doing tp testing
+    char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %ld\r\n\r\n";
+    char* r_buf;
+    int r = asprintf(&r_buf, header, t_size);
+    int max_bytes = r+t_size;
+    char* reply = (char*) calloc(max_bytes, 1); //allocate memory for bulk file transfer and initialise
+    strcat(reply, r_buf);
+    reply_len = max_bytes;
+
 
 
     //first we need to set up the addresses
@@ -268,22 +264,24 @@ void *polling_thread(void *data){
                 //make the buffer and 0 it
                 char buf[BUFFER_SIZE]; // read buffer
                 bzero(buf, sizeof(buf));//this is just sensible
+
                 int bytes_recv = read(current_fd, buf, sizeof(buf));
 
-                while(bytes_recv){
-                    write(current_fd, reply, reply_len);
-                    bytes_recv = read(current_fd, buf, sizeof(buf));     
-                    printf("bytes_recv: %d\n", bytes_recv);       
-                
-                }
                 if (bytes_recv <= 0){// if recv buffer empty or error then close fd 
                     close(current_fd);
                     update_tracker(threadID, -1);
                     sent_bytes[threadID] = 0;
                 }else{
 
-                    
-                    
+                    if (mode == 1){ //latency tests
+                        char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
+                        write(current_fd, header, strlen(header));
+
+                    } else if (mode == 0){ //tp testing
+                        sent_bytes[threadID]++;//used for tp tracking
+                        write(current_fd, reply, max_bytes);
+                        
+                    }
                 }
             }
         }
