@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <netinet/in.h> 
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <arpa/inet.h>
 #include <pthread.h>
 
@@ -22,6 +23,7 @@
 #include <sys/event.h>
 #include <sys/sysctl.h>	
 #endif
+#include <netinet/tcp.h>
 
 #define PORT 1234
 #define Q_LEN 16
@@ -96,6 +98,20 @@ static int setup_listener(){
         exit(EXIT_FAILURE);
         close(listen_sock);
     }
+    if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int))){
+	    perror("setsockopt");
+        exit(EXIT_FAILURE);
+        close(listen_sock);
+    }
+    if (setsockopt(listen_sock, SOL_SOCKET, TCP_NODELAY, &(int){1}, sizeof(int))){
+	    perror("setsockopt");
+        exit(EXIT_FAILURE);
+        close(listen_sock);
+    }
+    if (ioctl(listen_sock, FIONBIO, &(int){1}) < 0) {
+	perror("ioctl");
+        close(listen_sock);
+    }
     //bind listener to addr and port 
     if (bind(listen_sock, (struct sockaddr *) &s_addr, s_addr_len) < 0){
         perror("bind failed");
@@ -127,11 +143,10 @@ static void accept_conn(int fd, int pfd){
     //assign socket to the new connection
     int conn_sock = accept(fd, (struct sockaddr*)&c_addr, &c_addr_len);
     if (conn_sock == -1){
-        perror("cannot accept new connection");
-        exit(EXIT_FAILURE);
+        perror("accept");
+	return;
     }
 
-    setnonblocking(conn_sock);
     struct linger sl = {.l_onoff = 1, .l_linger = 0};
     setsockopt(fd, SOL_SOCKET, SO_LINGER, &sl, sizeof(sl));
 
@@ -143,6 +158,7 @@ static void accept_conn(int fd, int pfd){
         
     #else
 
+	memset(&ev, 0, sizeof(ev));
         EV_SET(&ev, conn_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
         kevent(pfd, &ev, 1, NULL, 0, NULL);
 
