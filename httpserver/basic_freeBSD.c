@@ -118,40 +118,43 @@ static void accept_conn(int fd, int pfd){
     }
     setnonblocking(conn_sock);
 
-    #ifdef linux
+	memset(&ev, 0, sizeof(ev));
+    EV_SET(&ev, conn_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
+    kevent(pfd, &ev, 1, NULL, 0, NULL);
 
-        ev.events = EPOLLIN;
-        ev.data.fd = conn_sock;
-        epoll_ctl(pfd, EPOLL_CTL_ADD, conn_sock, &ev);
-        
-    #else
-
-	    memset(&ev, 0, sizeof(ev));
-        EV_SET(&ev, conn_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
-        kevent(pfd, &ev, 1, NULL, 0, NULL);
-
-    #endif
 
 }
 
 
 
+int main(int argc, char *argv[]){
 
 
-//using void as a pointer lets you point to anything you like,
-//and for some reason when threading you need to pass the arg struct as void
-static void polling_thread(){
-    //unpack arguments
+    struct sockaddr_in s_addr;//addr we want to bind the socket to
+    int s_addr_len;
+    
+    set_sockaddr(&s_addr);
+    s_addr_len = sizeof(s_addr);
+
+
+    //print various configuration settings
+    printf("Running freeBSD\n");
+    
+
+    printf("PORT: %d\n", PORT);
+    printf("EPOLL_Q_LENGTH: %d\n", Q_LEN);
+    printf("TIMEOUT: %d\n", TIMEOUT);
+
+
+    //each thread has its own listener and epoll instance, the only thing they share is the port
+    
     int listen_sock = setup_listener();
-
     int pfd;  //polling fd
     int nfds; 
 
-    #ifdef linux
-        struct epoll_event evts[MAX_EVENTS];
-    #else
-        struct kevent evts[MAX_EVENTS];
-    #endif
+
+    struct kevent evts[MAX_EVENTS];
+
 
     //allocate data for transfer, i do it regardless but i only need it when doing tp testing
     char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %ld\r\n\r\n";
@@ -161,56 +164,32 @@ static void polling_thread(){
     char* reply = (char*) calloc(max_bytes, 1); //allocate memory for bulk file transfer and initialise
     strcat(reply, r_buf);
     int reply_len = max_bytes;
-
-
-
-    //first we need to set up the addresses
     
     
     
-    #ifdef linux
-        //create epoll instance
-        struct epoll_event ev;
+    //create kqueue
+    struct kevent ev;
 
-        pfd = epoll_create1(EPOLL_CLOEXEC);
-        if (pfd == -1) {
-            perror("epoll_create1");
-            exit(EXIT_FAILURE);
-        }
-        
-        //add listen socket to interest list
-        ev.events = EPOLLIN; //type of event we are looking for
-        ev.data.fd = listen_sock;
-        epoll_ctl(pfd, EPOLL_CTL_ADD, ev.data.fd, &ev);
-    
-
-    #else
-        //create kqueue
-        struct kevent ev;
-
-        pfd = kqueue();
-        if (pfd == -1){
-            perror("kqueue");
-            exit(EXIT_FAILURE);
-        }
-
-        EV_SET(&ev, listen_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
-        //attach event to queue
-        if (kevent(pfd, &ev, 1, NULL, 0, NULL) == -1){
-            perror("kevent failed");
+    pfd = kqueue();
+    if (pfd == -1){
+        perror("kqueue");
         exit(EXIT_FAILURE);
-        }
+    }
 
-    #endif
+    EV_SET(&ev, listen_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
+    //attach event to queue
+    if (kevent(pfd, &ev, 1, NULL, 0, NULL) == -1){
+        perror("kevent failed");
+    exit(EXIT_FAILURE);
+    }
+
+
 
     for (;;){
 
-        #ifdef linux
-            nfds = epoll_wait(pfd, evts, MAX_EVENTS, TIMEOUT);
-        #else
-            struct timespec timeout = {TIMEOUT, 0};
-            nfds = kevent(pfd, NULL, 0, evts, MAX_EVENTS, &timeout);
-        #endif
+        struct timespec timeout = {TIMEOUT, 0};
+        nfds = kevent(pfd, NULL, 0, evts, MAX_EVENTS, &timeout);
+
 
         //loop through all the fd's to find new connections
         for (int n = 0; n < nfds; ++n){
@@ -252,36 +231,4 @@ static void polling_thread(){
             }
         }
     }
-}
-
-
-int main(int argc, char *argv[]){
-
-    //thread arguments
-
-
-    //LOCAL VARIABLES
-    //socket stuff
-    int listen_sock = setup_listener();
-    struct sockaddr_in s_addr;//addr we want to bind the socket to
-    int s_addr_len;
-    
-    set_sockaddr(&s_addr);
-    s_addr_len = sizeof(s_addr);
-
-
-    //print various configuration settings
-    #ifdef linux
-        printf("Running Linux\n");
-    #else
-        printf("Running freeBSD\n");
-    #endif
-
-    printf("PORT: %d\n", PORT);
-    printf("EPOLL_Q_LENGTH: %d\n", Q_LEN);
-    printf("TIMEOUT: %d\n", TIMEOUT);
-
-
-    //each thread has its own listener and epoll instance, the only thing they share is the port
-    polling_thread();
 }
