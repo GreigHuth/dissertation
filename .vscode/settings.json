@@ -2,6 +2,7 @@
     "files.associations": {
         "epoll.h": "c",
         "in.h": "c",
-        "unistd.h": "c"
+        "unistd.h": "c",
+        "sysctl.h": "c"
     }
 }

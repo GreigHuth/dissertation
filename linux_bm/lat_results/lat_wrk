@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# $1 is the # of threads
+# $2 is the # of connections
+# $3 is the duration of the test
+#TODO
+
+
+
+if [ $# -lt 2 ]
+then
+    echo "USAGE: run_wrk <threads> <duration>"
+    exit
+fi
+
+test_params=(4 10 25 50 75 100 150 200 300 400 500 750 1000)
+
+for i in {0..12}
+do
+    for j in {1..3}
+    do
+        echo "running test ${test_params[$i]}. Run: $j"
+        wrk --latency -t$1 -c${test_params[$i]} -d$2s -s ./wrk2csv.lua http://192.168.11.5:1234/index.html
+        sleep 2
+    done
+done
