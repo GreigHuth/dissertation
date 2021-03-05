@@ -223,7 +223,6 @@ static void polling_thread(){
                 int current_fd = evts[n].data.fd;
             #else  
                 int current_fd = evts[n].ident;
-                printf("thread: %d flags:%d\n", threadID, evts[n].flags);
 
             #endif
             
@@ -250,7 +249,6 @@ static void polling_thread(){
 
                     } else if (mode == 0){ //tp testing
                         write(current_fd, reply, max_bytes);
-                        print("%d\n", max_bytes);
 
                         
                     }
@@ -284,7 +282,7 @@ int main(int argc, char *argv[]){
 
     if (*argv[1] == '0'){
         if (argc < 3){
-            printf("If using throughput testing mode please supply trasfer size\n");
+            printf("If using throughput testing mode please supply transfer size\n");
             exit(0);
         }else{
             t_size = atoi(argv[2]);
