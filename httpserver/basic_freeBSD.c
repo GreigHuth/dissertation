@@ -35,19 +35,9 @@
 
 //Global variables 
 int DEBUG = 0;
-pthread_mutex_t lock;
-int connections[THREADS];
-int sent_bytes[THREADS];
 int mode = 1; // 0 -  throughput testing mode
               // 1 -  latency testing mode 
-
 int t_size = 0;
-
-//struct to pass the listen socket to the threads
-struct t_args{
-    int threadID;
-    int listen_sock;
-};
 
 //set fd to non blocking, more portable than doing it in the socket definition
 static int setnonblocking(int sockfd){
@@ -68,12 +58,6 @@ static void set_sockaddr(struct sockaddr_in * addr){
     addr->sin_port = htons(PORT);
 }
 
-
-static void update_tracker(int threadID, int value){
-    pthread_mutex_lock(&lock);
-    connections[threadID] += value;
-    pthread_mutex_unlock(&lock);
-}
 
 
 static int setup_listener(){
@@ -101,15 +85,6 @@ static int setup_listener(){
     if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int))){
 	    perror("setsockopt");
         exit(EXIT_FAILURE);
-        close(listen_sock);
-    }
-    if (setsockopt(listen_sock, SOL_SOCKET, TCP_NODELAY, &(int){1}, sizeof(int))){
-	    perror("setsockopt");
-        exit(EXIT_FAILURE);
-        close(listen_sock);
-    }
-    if (ioctl(listen_sock, FIONBIO, &(int){1}) < 0) {
-	perror("ioctl");
         close(listen_sock);
     }
     //bind listener to addr and port 
@@ -147,9 +122,6 @@ static void accept_conn(int fd, int pfd){
 	return;
     }
 
-    struct linger sl = {.l_onoff = 1, .l_linger = 0};
-    setsockopt(fd, SOL_SOCKET, SO_LINGER, &sl, sizeof(sl));
-
     #ifdef linux
 
         ev.events = EPOLLIN;
@@ -172,12 +144,9 @@ static void accept_conn(int fd, int pfd){
 
 //using void as a pointer lets you point to anything you like,
 //and for some reason when threading you need to pass the arg struct as void
-void *polling_thread(void *data){
+static void polling_thread(){
     //unpack arguments
-    struct t_args *args = data;
-    int threadID = args->threadID;
-    int listen_sock = args->listen_sock;
-    printf("Thread %d created\n",threadID);
+    int listen_sock = setup_listener();
 
     int pfd;  //polling fd
     int nfds; 
@@ -262,7 +231,6 @@ void *polling_thread(void *data){
 
                 //printf("accepting connection\n");
                 accept_conn(current_fd, pfd);
-		        update_tracker(threadID, 1);
                 break;
 
             }else {//if current_fd is not the listener we can do stuff
@@ -274,7 +242,6 @@ void *polling_thread(void *data){
 
                 if (bytes_recv <= 0){// if recv buffer empty or error then close fd 
                     close(current_fd);
-                    update_tracker(threadID, -1);
                 }else{
 
                     if (mode == 1){ //latency tests
@@ -297,7 +264,7 @@ void *polling_thread(void *data){
 int main(int argc, char *argv[]){
 
     //thread arguments
-    struct t_args t_args;
+
 
     //LOCAL VARIABLES
     //socket stuff
@@ -338,52 +305,5 @@ int main(int argc, char *argv[]){
 
 
     //each thread has its own listener and epoll instance, the only thing they share is the port
-    pthread_t threads[THREADS];
-    
-    //set cpu affinity
-
-    #ifdef linux
-
-    #else
-        cpuset_t cpuset;
-        CPU_ZERO(&cpuset);
-        for (int j = 0; j < THREADS; j++)
-               CPU_SET(j, &cpuset);
-    #endif
-
-
-     for (int i=0; i < THREADS; i++){
-   
-        struct t_args* args = malloc(sizeof(*args));
-        args->threadID = i;
-        args->listen_sock = listen_sock;
-
-        int rc = pthread_create(&threads[i], NULL, polling_thread, (void*)args);
-
-        if (rc){
-            printf("ERROR; return code from pthread_create() is %d\n", rc);
-            exit(0);
-        }    
-
-        #ifdef linux
-        #else
-            rc = pthread_setaffinity_np(threads[i], sizeof(cpuset), &cpuset);
-            if (rc != 0)
-               perror("pthread_setaffinity_np");
-        #endif
-    }
-
-    for (;;){
-        for (int i=0; i < THREADS; i++){
-            printf("thread %d connections: %d\n",i, connections[i]);
-            
-        }
-        for (int i=0; i < THREADS; i++){
-            printf("thread %d requests: %d\n",i, sent_bytes[i]);            
-        }
-
-        
-        sleep(1);
-        system("clear");
-    }
+    polling_thread();
 }
