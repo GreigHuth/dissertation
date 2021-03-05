@@ -192,7 +192,7 @@ void *polling_thread(void *data){
     char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %ld\r\n\r\n";
     char* r_buf;
     int r = asprintf(&r_buf, header, t_size);
-    int max_bytes = r+t_size;
+    long max_bytes = r+t_size;
     char* reply = (char*) calloc(max_bytes, 1); //allocate memory for bulk file transfer and initialise
     strcat(reply, r_buf);
     int reply_len = max_bytes;
@@ -283,6 +283,8 @@ void *polling_thread(void *data){
 
                     } else if (mode == 0){ //tp testing
                         write(current_fd, reply, max_bytes);
+                        print("%d\n", max_bytes);
+                        
                         
                     }
                 }
