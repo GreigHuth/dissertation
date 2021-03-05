@@ -82,11 +82,6 @@ static int setup_listener(){
         exit(EXIT_FAILURE);
         close(listen_sock);
     }
-    if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int))){
-	    perror("setsockopt");
-        exit(EXIT_FAILURE);
-        close(listen_sock);
-    }
     //bind listener to addr and port 
     if (bind(listen_sock, (struct sockaddr *) &s_addr, s_addr_len) < 0){
         perror("bind failed");
@@ -119,8 +114,9 @@ static void accept_conn(int fd, int pfd){
     int conn_sock = accept(fd, (struct sockaddr*)&c_addr, &c_addr_len);
     if (conn_sock == -1){
         perror("accept");
-	return;
+	    return;
     }
+    setnonblocking(conn_sock);
 
     #ifdef linux
 
@@ -130,7 +126,7 @@ static void accept_conn(int fd, int pfd){
         
     #else
 
-	memset(&ev, 0, sizeof(ev));
+	    memset(&ev, 0, sizeof(ev));
         EV_SET(&ev, conn_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
         kevent(pfd, &ev, 1, NULL, 0, NULL);
 
@@ -230,7 +226,7 @@ static void polling_thread(){
 
                 //printf("accepting connection\n");
                 accept_conn(current_fd, pfd);
-                break;
+                continue;
 
             }else {//if current_fd is not the listener we can do stuff
                 //make the buffer and 0 it
