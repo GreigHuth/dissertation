@@ -270,22 +270,6 @@ int main(int argc, char *argv[]){
     s_addr_len = sizeof(s_addr);
 
 
-    //arg handling
-    if (argc < 2){
-        printf("USAGE: ./new <mode> <data transfer size>\n");
-        exit(0);
-    }
-
-    if (*argv[1] == '0'){
-        if (argc < 3){
-            printf("If using throughput testing mode please supply transfer size\n");
-            exit(0);
-        }else{
-            t_size = atoi(argv[2]);
-            mode = 0;
-        }
-    }
-
     //print various configuration settings
     #ifdef linux
         printf("Running Linux\n");
