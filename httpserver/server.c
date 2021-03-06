@@ -147,6 +147,12 @@ static void accept_conn(int fd, int pfd){
 	return;
     }
 
+    if (setsockopt(conn_sock, SOL_SOCKET, TCP_NODELAY, &(int){1}, sizeof(int))){
+	    perror("setsockopt");
+        exit(EXIT_FAILURE);
+        close(conn_sock);
+
+
     struct linger sl = {.l_onoff = 1, .l_linger = 0};
     setsockopt(fd, SOL_SOCKET, SO_LINGER, &sl, sizeof(sl));
 
