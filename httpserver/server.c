@@ -151,6 +151,7 @@ static void accept_conn(int fd, int pfd){
 	    perror("setsockopt");
         exit(EXIT_FAILURE);
         close(conn_sock);
+    }
 
 
     struct linger sl = {.l_onoff = 1, .l_linger = 0};
@@ -260,7 +261,6 @@ void *polling_thread(void *data){
                 int current_fd = evts[n].data.fd;
             #else  
                 int current_fd = evts[n].ident;
-                printf("thread: %d flags:%d\n", threadID, evts[n].flags);
 
             #endif
             
@@ -289,7 +289,6 @@ void *polling_thread(void *data){
 
                     } else if (mode == 0){ //tp testing
                         write(current_fd, reply, max_bytes);
-                        print("%d\n", max_bytes);
 
                         
                     }
