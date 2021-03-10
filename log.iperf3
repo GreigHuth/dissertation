@@ -3663,3 +3663,15 @@ iperf3: exiting
 	},
 	"error":	"interrupt - the server has terminated"
 }
+{
+	"start":	{
+		"connected":	[],
+		"version":	"iperf 3.7",
+		"system_info":	"Linux n04 5.8.0-25-generic #26~20.04.1-Ubuntu SMP Thu Oct 15 14:55:06 UTC 2020 x86_64"
+	},
+	"intervals":	[],
+	"end":	{
+	},
+	"error":	"error - unable to start listener for connections: Cannot assign requested address",
+	"error":	"exiting"
+}
