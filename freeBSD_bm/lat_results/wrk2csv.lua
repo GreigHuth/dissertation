@@ -2,7 +2,7 @@
 
 done = function(summary, latency, requests)
   -- open output file
-  f = io.open("tp_default.csv", "a+")
+  f = io.open("lat_queues_2.csv", "a+")
   
   
   f:write(string.format("%f,%f,%f,%f,%f,%f,%f,%f,%d,%d,%d\n",
