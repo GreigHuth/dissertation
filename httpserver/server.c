@@ -264,7 +264,7 @@ void *polling_thread(void *data){
 
                 //printf("accepting connection\n");
                 accept_conn(current_fd, pfd);
-                update_tracker(threadID, 1);
+                //update_tracker(threadID, 1);
                 break;
 
             }else {//if current_fd is not the listener we can do stuff
@@ -276,7 +276,7 @@ void *polling_thread(void *data){
 
                 if (bytes_recv <= 0){// if recv buffer empty or error then close fd 
                     close(current_fd);
-                    update_tracker(threadID, -1);
+                    //update_tracker(threadID, -1);
                 }else{
                     char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
                     write(current_fd, header, strlen(header));
