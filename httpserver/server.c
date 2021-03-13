@@ -67,11 +67,11 @@ static void set_sockaddr(struct sockaddr_in * addr){
 }
 
 
-static void update_tracker(int threadID, int value){
-    pthread_mutex_lock(&lock);
-    connections[threadID] += value;
-    pthread_mutex_unlock(&lock);
-}
+//static void update_tracker(int threadID, int value){
+//    pthread_mutex_lock(&lock);
+//    connections[threadID] += value;
+//    pthread_mutex_unlock(&lock);
+//}
 
 
 static int setup_listener(){
