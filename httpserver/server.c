@@ -29,19 +29,17 @@
 #define Q_LEN 16
 #define MAX_EVENTS 1024
 #define BUFFER_SIZE 1024
-#define TIMEOUT 5
-#define THREADS 4
 
 
 //Global variables 
 int DEBUG = 0;
 pthread_mutex_t lock;
-int connections[THREADS];
-int sent_bytes[THREADS];
 int mode = 1; // 0 -  throughput testing mode
               // 1 -  latency testing mode 
 
 int t_size = 0;
+int TIMEOUT = 0;
+int THREADS = 1;
 
 //struct to pass the listen socket to the threads
 struct t_args{
@@ -52,7 +50,7 @@ struct t_args{
 //set fd to non blocking, more portable than doing it in the socket definition
 static int setnonblocking(int sockfd){
     if (fcntl(sockfd, F_SETFD, fcntl(sockfd, F_GETFD, 0) | O_NONBLOCK) ==-1) {
-	return -1;
+    return -1;
     }
     return 0;
 }
@@ -94,22 +92,22 @@ static int setup_listener(){
     
     //set sock options that allow you to reuse addresses and ports
     if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEPORT, &(int){1}, sizeof(int))){
-	    perror("setsockopt");
+        perror("setsockopt");
         exit(EXIT_FAILURE);
         close(listen_sock);
     }
     if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int))){
-	    perror("setsockopt");
+        perror("setsockopt");
         exit(EXIT_FAILURE);
         close(listen_sock);
     }
     if (setsockopt(listen_sock, SOL_SOCKET, TCP_NODELAY, &(int){1}, sizeof(int))){
-	    perror("setsockopt");
+        perror("setsockopt");
         exit(EXIT_FAILURE);
         close(listen_sock);
     }
     if (ioctl(listen_sock, FIONBIO, &(int){1}) < 0) {
-	perror("ioctl");
+    perror("ioctl");
         close(listen_sock);
     }
     //bind listener to addr and port 
@@ -134,7 +132,6 @@ static void accept_conn(int fd, int pfd){
 
     #else 
         struct kevent ev;
-    
     #endif
 
     struct sockaddr_in c_addr;//address of the client
@@ -144,11 +141,11 @@ static void accept_conn(int fd, int pfd){
     int conn_sock = accept(fd, (struct sockaddr*)&c_addr, &c_addr_len);
     if (conn_sock == -1){
         perror("accept");
-	return;
+        return;
     }
 
     if (setsockopt(conn_sock, SOL_SOCKET, TCP_NODELAY, &(int){1}, sizeof(int))){
-	    perror("setsockopt");
+        perror("setsockopt");
         exit(EXIT_FAILURE);
         close(conn_sock);
     }
@@ -165,7 +162,7 @@ static void accept_conn(int fd, int pfd){
         
     #else
 
-	memset(&ev, 0, sizeof(ev));
+        memset(&ev, 0, sizeof(ev));
         EV_SET(&ev, conn_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
         kevent(pfd, &ev, 1, NULL, 0, NULL);
 
@@ -190,9 +187,9 @@ void *polling_thread(void *data){
     int nfds; 
 
     #ifdef linux
-        struct epoll_event evts[MAX_EVENTS];
+    struct epoll_event evts[MAX_EVENTS];
     #else
-        struct kevent evts[MAX_EVENTS];
+    struct kevent evts[MAX_EVENTS];
     #endif
 
     //allocate data for transfer, i do it regardless but i only need it when doing tp testing
@@ -211,64 +208,63 @@ void *polling_thread(void *data){
     
     
     #ifdef linux
-        //create epoll instance
-        struct epoll_event ev;
+    //create epoll instance
+    struct epoll_event ev;
 
-        pfd = epoll_create1(EPOLL_CLOEXEC);
-        if (pfd == -1) {
-            perror("epoll_create1");
-            exit(EXIT_FAILURE);
-        }
-        
-        //add listen socket to interest list
-        ev.events = EPOLLIN; //type of event we are looking for
-        ev.data.fd = listen_sock;
-        epoll_ctl(pfd, EPOLL_CTL_ADD, ev.data.fd, &ev);
+    pfd = epoll_create1(EPOLL_CLOEXEC);
+    if (pfd == -1) {
+        perror("epoll_create1");
+        exit(EXIT_FAILURE);
+    }
+    
+    //add listen socket to interest list
+    ev.events = EPOLLIN; //type of event we are looking for
+    ev.data.fd = listen_sock;
+    epoll_ctl(pfd, EPOLL_CTL_ADD, ev.data.fd, &ev);
     
 
     #else
-        //create kqueue
-        struct kevent ev;
+    //create kqueue
+    struct kevent ev;
 
-        pfd = kqueue();
-        if (pfd == -1){
-            perror("kqueue");
-            exit(EXIT_FAILURE);
-        }
-
-        EV_SET(&ev, listen_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
-        //attach event to queue
-        if (kevent(pfd, &ev, 1, NULL, 0, NULL) == -1){
-            perror("kevent failed");
+    pfd = kqueue();
+    if (pfd == -1){
+        perror("kqueue");
         exit(EXIT_FAILURE);
-        }
+    }
+
+    EV_SET(&ev, listen_sock, EVFILT_READ, EV_ADD, 0, 0, NULL);
+    //attach event to queue
+    if (kevent(pfd, &ev, 1, NULL, 0, NULL) == -1){
+        perror("kevent failed");
+    exit(EXIT_FAILURE);
+    }
 
     #endif
 
     for (;;){
 
         #ifdef linux
-            nfds = epoll_wait(pfd, evts, MAX_EVENTS, TIMEOUT);
+        nfds = epoll_wait(pfd, evts, MAX_EVENTS, TIMEOUT);
         #else
-            struct timespec timeout = {TIMEOUT, 0};
-            nfds = kevent(pfd, NULL, 0, evts, MAX_EVENTS, &timeout);
+        struct timespec timeout = {TIMEOUT, 0};
+        nfds = kevent(pfd, NULL, 0, evts, MAX_EVENTS, &timeout);
         #endif
 
         //loop through all the fd's to find new connections
         for (int n = 0; n < nfds; ++n){
 
             #ifdef linux
-                int current_fd = evts[n].data.fd;
+            int current_fd = evts[n].data.fd;
             #else  
-                int current_fd = evts[n].ident;
-
+            int current_fd = evts[n].ident;
             #endif
             
             if (current_fd == listen_sock){//listen socket ready means new connection
 
                 //printf("accepting connection\n");
                 accept_conn(current_fd, pfd);
-		        update_tracker(threadID, 1);
+                update_tracker(threadID, 1);
                 break;
 
             }else {//if current_fd is not the listener we can do stuff
@@ -282,17 +278,10 @@ void *polling_thread(void *data){
                     close(current_fd);
                     update_tracker(threadID, -1);
                 }else{
-
-                    if (mode == 1){ //latency tests
-                        char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
-                        write(current_fd, header, strlen(header));
-
-                    } else if (mode == 0){ //tp testing
-                        write(current_fd, reply, max_bytes);
-
-                        
-                    }
+                    char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
+                    write(current_fd, header, strlen(header));
                 }
+                
             }
         }
     }
@@ -315,20 +304,15 @@ int main(int argc, char *argv[]){
 
 
     //arg handling
-    if (argc < 2){
-        printf("USAGE: ./new <mode> <data transfer size>\n");
+    if (argc < 3){
+        printf("USAGE: <threads> <response size> <timeout>\n");
         exit(0);
+    }else{
+        THREADS = atoi(argv[1]);
+        t_size = atoi(argv[2]);
+        TIMEOUT = atoi(argv[3]);
     }
 
-    if (*argv[1] == '0'){
-        if (argc < 3){
-            printf("If using throughput testing mode please supply trasfer size\n");
-            exit(0);
-        }else{
-            t_size = atoi(argv[2]);
-            mode = 0;
-        }
-    }
 
     //print various configuration settings
     #ifdef linux
@@ -338,8 +322,10 @@ int main(int argc, char *argv[]){
     #endif
 
     printf("PORT: %d\n", PORT);
-    printf("EPOLL_Q_LENGTH: %d\n", Q_LEN);
+    printf("THREADS: %d\n", THREADS);
+    printf("REPONSE SIZE: %d bytes\n", t_size);
     printf("TIMEOUT: %d\n", TIMEOUT);
+    printf("")
 
 
     //each thread has its own listener and epoll instance, the only thing they share is the port
@@ -379,16 +365,20 @@ int main(int argc, char *argv[]){
     }
 
     for (;;){
-        for (int i=0; i < THREADS; i++){
-            printf("thread %d connections: %d\n",i, connections[i]);
-            
-        }
-        for (int i=0; i < THREADS; i++){
-            printf("thread %d requests: %d\n",i, sent_bytes[i]);            
-        }
 
-        
-        sleep(1);
-        system("clear");
     }
+
+    //for (;;){
+    //    for (int i=0; i < THREADS; i++){
+    //        printf("thread %d connections: %d\n",i, connections[i]);
+    //        
+    //    }
+    //    for (int i=0; i < THREADS; i++){
+    //        printf("thread %d requests: %d\n",i, sent_bytes[i]);            
+    //    }
+    //
+    //    
+    //    sleep(1);
+    //    system("clear");
+    //}
 }
