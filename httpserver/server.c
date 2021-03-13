@@ -278,8 +278,7 @@ void *polling_thread(void *data){
                     close(current_fd);
                     //update_tracker(threadID, -1);
                 }else{
-                    char *header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello world!";
-                    write(current_fd, header, strlen(header));
+                    write(current_fd, reply, max_bytes);
                 }
                 
             }
