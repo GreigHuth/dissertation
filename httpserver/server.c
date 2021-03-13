@@ -325,7 +325,6 @@ int main(int argc, char *argv[]){
     printf("THREADS: %d\n", THREADS);
     printf("REPONSE SIZE: %d bytes\n", t_size);
     printf("TIMEOUT: %d\n", TIMEOUT);
-    printf("")
 
 
     //each thread has its own listener and epoll instance, the only thing they share is the port
