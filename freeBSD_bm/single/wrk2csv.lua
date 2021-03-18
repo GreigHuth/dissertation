@@ -2,7 +2,7 @@
 
 done = function(summary, latency, requests)
   -- open output file
-  f = io.open("hwoffloading_1MB_T10.csv", "a+")
+  f = io.open("INM0_ring1024_50KB_T0.csv", "a+")
   
   
   f:write(string.format("%f,%f,%f,%f,%f,%f,%f,%f,%d,%d,%d\n",
